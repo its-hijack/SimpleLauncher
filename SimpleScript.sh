@@ -31,6 +31,7 @@ DATA_DIR="$HOME/.simplescript"
 # -------------------------------------------------------------------------------------
 SUPPORTED_DEVICES=(
   "AFTSS|Fire TV Stick HD|7|yes|yes"
+  "AFTARK|Fire TV Stick 4K Max (2nd Gen)|8|no|yes"
 )
 
 # -------------------------------------------------------------------------------------
@@ -43,7 +44,6 @@ SUPPORTED_DEVICES=(
 # -------------------------------------------------------------------------------------
 TESTING_DEVICES=(
   "AFTSS|Fire TV Stick HD|8"
-  "AFTARK|Fire TV Stick 4K Max (2nd Gen)|*"
 )
 
 # Amazon's automatic Fire OS updater. Switching it off stops updates installing by themselves

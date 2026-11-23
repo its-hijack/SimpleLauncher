@@ -31,6 +31,7 @@ for devices that have been tested, so nothing can go wrong on the rest.
 | Device | Model code | Tested on | SimpleLauncher | HomeCatch |
 |---|---|---|:---:|:---:|
 | Fire TV Stick HD | AFTSS | Fire OS 7 | ✓ | ✓ |
+| Fire TV Stick 4K Max (2nd Gen) | AFTARK | Fire OS 8 | ✓ | ✓ |
 | Other Fire TV devices | | | ✓ (as an app) | Not yet |
 | Android TV, Google TV, phones and tablets (Android 7.1+) | | | ✓ (as your home screen) | Not needed |
 

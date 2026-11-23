@@ -26,13 +26,13 @@ $RepoUrl = "https://github.com/$Repo"
 
 # Supported devices: model code | name | Fire OS version tested | extras | HomeCatch
 $SupportedDevices = @(
-    'AFTSS|Fire TV Stick HD|7|yes|yes'
+    'AFTSS|Fire TV Stick HD|7|yes|yes',
+    'AFTARK|Fire TV Stick 4K Max (2nd Gen)|8|no|yes'
 )
 
 # Devices being tested: HomeCatch only. model code | name | Fire OS version (* = any)
 $TestingDevices = @(
-    'AFTSS|Fire TV Stick HD|8',
-    'AFTARK|Fire TV Stick 4K Max (2nd Gen)|*'
+    'AFTSS|Fire TV Stick HD|8'
 )
 $UpdaterPkg = 'com.amazon.tv.forcedotaupdater.v2'
 
