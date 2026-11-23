@@ -29,12 +29,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The home screen: logo and clock, three buttons, your apps across the middle,
- * and Continue Watching (Plex) underneath.
+ * The home screen: logo and clock, three buttons, then your apps and Continue Watching.
+ * Default layout: one row of apps with Continue Watching underneath.
+ * Grid layout: Continue Watching on top, with your apps in a grid underneath.
  */
 public class MainActivity extends Activity {
 
-    private static final long PLEX_REFRESH_MS = 60_000;
+    private static final long WATCH_REFRESH_MS = 60_000;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, Apps.Entry> byPkg = new HashMap<>();
@@ -44,14 +45,20 @@ public class MainActivity extends Activity {
     private TextClock clock;
     private TextClock ampm;
     private TextClock date;
+    private LinearLayout body;
     private View appsSection;
+    private View appsScroll;
     private LinearLayout appsRow;
+    private LinearLayout appsGrid;
     private View plexSection;
     private View plexScroll;
     private LinearLayout plexRow;
     private TextView plexStatus;
+    private TextView watchLabel;
 
-    private boolean plexLoading;
+    private boolean watchLoading;
+    private boolean grid;
+    private String layoutKey;   // layout and sizes last drawn, to redraw when they change
 
     private FocusRing ring;
     private Object savedFocusTag;
@@ -75,8 +82,12 @@ public class MainActivity extends Activity {
         clock = findViewById(R.id.clock);
         ampm = findViewById(R.id.ampm);
         date = findViewById(R.id.date);
+        body = findViewById(R.id.body);
         appsSection = findViewById(R.id.apps_section);
+        appsScroll = findViewById(R.id.apps_scroll);
         appsRow = findViewById(R.id.apps_row);
+        appsGrid = findViewById(R.id.apps_grid);
+        watchLabel = findViewById(R.id.watch_label);
         plexSection = findViewById(R.id.plex_section);
         plexScroll = findViewById(R.id.plex_scroll);
         plexRow = findViewById(R.id.plex_row);
@@ -116,7 +127,7 @@ public class MainActivity extends Activity {
         HomeButtonService.launcherShown();
         applySettings();
         reloadApps();
-        refreshPlex(false);
+        refreshWatching(false);
     }
 
     @Override
@@ -153,8 +164,32 @@ public class MainActivity extends Activity {
         Ui.applyBackground(this, root);
         Ui.applyClock(this, clock, ampm, date);
         appsSection.setVisibility(Prefs.showApps(this) ? View.VISIBLE : View.GONE);
-        plexSection.setVisibility(Prefs.showPlex(this) && Plex.installed(this) ? View.VISIBLE : View.GONE);
+        plexSection.setVisibility(Watching.shown(this) ? View.VISIBLE : View.GONE);
+        watchLabel.setText(Watching.title(this));
         ((TextView) findViewById(R.id.btn_amazon)).setText(Mode.homeButtonLabel(this));
+
+        // Layout: Grid puts Continue Watching first and the apps in a grid underneath.
+        grid = Prefs.gridLayout(this);
+        String key = grid + "/" + Prefs.appSize(this) + "/" + Prefs.cardSize(this);
+        if (!key.equals(layoutKey)) {
+            layoutKey = key;
+            body.removeView(appsSection);
+            body.removeView(plexSection);
+            body.addView(grid ? plexSection : appsSection);
+            body.addView(grid ? appsSection : plexSection);
+            setTopMargin(grid ? plexSection : appsSection, grid ? 26 : 50);
+            setTopMargin(grid ? appsSection : plexSection, grid ? 14 : 18);
+            appsScroll.setVisibility(grid ? View.GONE : View.VISIBLE);
+            appsGrid.setVisibility(grid ? View.VISIBLE : View.GONE);
+            if (!byPkg.isEmpty()) renderApps();   // otherwise the app list is still loading
+            if (Plex.cache != null || Jellyfin.cache != null) renderWatching(cards());
+        }
+    }
+
+    private void setTopMargin(View v, int dp) {
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
+        lp.topMargin = Ui.dp(this, dp);
+        v.setLayoutParams(lp);
     }
 
     // ------------------------------------------------------------------ your apps row
@@ -183,12 +218,15 @@ public class MainActivity extends Activity {
 
     private void renderApps() {
         View focused = getCurrentFocus();
-        Object tag = focused != null && isInside(focused, appsRow) ? focused.getTag() : savedFocusTag;
+        Object tag = focused != null && (isInside(focused, appsRow) || isInside(focused, appsGrid))
+                ? focused.getTag() : savedFocusTag;
 
-        appsRow.removeAllViews();
+        int w = Watching.appTileWidth(grid, Prefs.appSize(this));
+        List<View> tiles = new ArrayList<>();
         for (String pkg : visibleFavourites()) {
             final Apps.Entry e = byPkg.get(pkg);
-            Ui.Tile t = Ui.appTile(this, e);
+            if (e == null) continue;
+            Ui.Tile t = Ui.appTile(this, e, w);
             t.card.setBackground(Ui.plainCardBackground(this));
             t.root.setTag("app:" + pkg);
             t.root.setOnClickListener(v -> Apps.launch(this, e));
@@ -197,17 +235,42 @@ public class MainActivity extends Activity {
                 return true;
             });
             t.root.setOnKeyListener((v, keyCode, event) -> onMenuKey(keyCode, event, () -> showAppOptions(e)));
-            appsRow.addView(t.root, Ui.rowItemParams(this));
+            tiles.add(t.root);
         }
-        if (appsRow.getChildCount() == 0) {
-            Ui.Tile t = Ui.textTile(this, "+", "Choose your apps");
+        if (tiles.isEmpty()) {
+            Ui.Tile t = Ui.textTile(this, "+", "Choose your apps", w);
             t.card.setBackground(Ui.plainCardBackground(this));
             t.root.setTag("choose");
             t.root.setOnClickListener(v -> Screen.open(this, new Intent(this, AppSelectionActivity.class)));
-            appsRow.addView(t.root, Ui.rowItemParams(this));
+            tiles.add(t.root);
         }
 
-        View target = tag != null ? appsRow.findViewWithTag(tag) : null;
+        appsRow.removeAllViews();
+        appsGrid.removeAllViews();
+        if (grid) {
+            // As many across as fit the screen at this size.
+            float widthDp = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+            int across = Math.max(1, (int) ((widthDp - 84 - 12 + Ui.GAP) / (w + Ui.GAP)));
+            LinearLayout line = null;
+            for (int i = 0; i < tiles.size(); i++) {
+                if (i % across == 0) {
+                    line = new LinearLayout(this);
+                    line.setOrientation(LinearLayout.HORIZONTAL);
+                    line.setClipChildren(false);
+                    line.setClipToPadding(false);
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    lp.setMargins(0, i == 0 ? 0 : Ui.dp(this, 12), 0, 0);
+                    appsGrid.addView(line, lp);
+                }
+                line.addView(tiles.get(i), Ui.rowItemParams(this));
+            }
+        } else {
+            for (View t : tiles) appsRow.addView(t, Ui.rowItemParams(this));
+        }
+
+        ViewGroup holder = grid ? appsGrid : appsRow;
+        View target = tag != null ? holder.findViewWithTag(tag) : null;
         if (target != null) {
             target.requestFocus();
         } else if (firstRender || getCurrentFocus() == null || (tag != null && tag.toString().startsWith("app:"))) {
@@ -217,9 +280,17 @@ public class MainActivity extends Activity {
         savedFocusTag = null;
     }
 
+    private View firstTile() {
+        if (grid) {
+            return appsGrid.getChildCount() > 0 ? ((ViewGroup) appsGrid.getChildAt(0)).getChildAt(0) : null;
+        }
+        return appsRow.getChildCount() > 0 ? appsRow.getChildAt(0) : null;
+    }
+
     private void focusFirstApp() {
-        if (appsSection.getVisibility() == View.VISIBLE && appsRow.getChildCount() > 0) {
-            appsRow.getChildAt(0).requestFocus();
+        View first = firstTile();
+        if (appsSection.getVisibility() == View.VISIBLE && first != null) {
+            first.requestFocus();
         } else if (plexSection.getVisibility() == View.VISIBLE && plexRow.getChildCount() > 0) {
             plexRow.getChildAt(0).requestFocus();
         } else {
@@ -233,11 +304,11 @@ public class MainActivity extends Activity {
         List<String> labels = new ArrayList<>();
         final List<Runnable> actions = new ArrayList<>();
         if (index > 0) {
-            labels.add("Move left");
+            labels.add(grid ? "Move earlier" : "Move left");
             actions.add(() -> moveFavourite(e.pkg, -1));
         }
         if (index >= 0 && index < visible.size() - 1) {
-            labels.add("Move right");
+            labels.add(grid ? "Move later" : "Move right");
             actions.add(() -> moveFavourite(e.pkg, 1));
         }
         labels.add("Remove from home screen");
@@ -262,41 +333,62 @@ public class MainActivity extends Activity {
         Prefs.setFavourites(this, favs);
         savedFocusTag = "app:" + pkg;
         renderApps();
-        View moved = appsRow.findViewWithTag("app:" + pkg);
+        View moved = (grid ? appsGrid : appsRow).findViewWithTag("app:" + pkg);
         if (moved != null) moved.requestFocus();
     }
 
-    // ------------------------------------------------------------------ Continue Watching (Plex)
+    // ------------------------------------------------------------------ Continue Watching (Plex and Jellyfin)
 
-    private void refreshPlex(boolean force) {
-        if (!Prefs.showPlex(this) || !Plex.installed(this)) return;
-        if (Prefs.plexToken(this) == null) {
-            showPlexStatus("Sign in to Plex in Settings to see what you're watching here.");
+    private List<Watching.Card> cards() {
+        return Watching.merge(Watching.plexOn(this) ? Plex.cache : null,
+                Watching.jellyfinOn(this) ? Jellyfin.cache : null);
+    }
+
+    private void refreshWatching(boolean force) {
+        if (!Watching.shown(this)) return;
+        final boolean plex = Watching.plexOn(this), jf = Watching.jellyfinOn(this);
+        if (!plex && !jf) {
+            showPlexStatus(Watching.emptyMessage(this));
             return;
         }
-        if (Plex.cache == null) Plex.cache = Plex.loadSaved(this);
-        if (Plex.cache != null) {
-            renderPlex(Plex.cache);
+        if (plex && Plex.cache == null) Plex.cache = Plex.loadSaved(this);
+        if (jf && Jellyfin.cache == null) Jellyfin.cache = Jellyfin.loadSaved(this);
+        boolean haveSaved = (plex && Plex.cache != null) || (jf && Jellyfin.cache != null);
+        if (haveSaved) {
+            renderWatching(cards());
         } else {
-            showPlexStatus("Loading from Plex…");
+            showPlexStatus("Loading\u2026");
         }
-        if (plexLoading) return;
-        if (!force && Plex.cache != null && SystemClock.elapsedRealtime() - Plex.cacheTime < PLEX_REFRESH_MS) return;
+        if (watchLoading) return;
+        boolean fresh = (!plex || (Plex.cache != null && SystemClock.elapsedRealtime() - Plex.cacheTime < WATCH_REFRESH_MS))
+                && (!jf || (Jellyfin.cache != null && SystemClock.elapsedRealtime() - Jellyfin.cacheTime < WATCH_REFRESH_MS));
+        if (!force && fresh) return;
 
-        plexLoading = true;
+        watchLoading = true;
         final Context app = getApplicationContext();
         new Thread(() -> {
-            final Plex.Result result = Plex.continueWatching(app);
+            final Plex.Result pr = plex ? Plex.continueWatching(app) : null;
+            final Jellyfin.Result jr = jf ? Jellyfin.continueWatching(app) : null;
             main.post(() -> {
-                plexLoading = false;
+                watchLoading = false;
                 if (isDestroyed()) return;
-                if (result.error != null && result.items.isEmpty()) {
-                    if (Plex.cache == null) showPlexStatus(result.error);
+                long now = SystemClock.elapsedRealtime();
+                if (pr != null && !(pr.error != null && pr.items.isEmpty())) {
+                    Plex.cache = pr.items;
+                    Plex.cacheTime = now;
+                }
+                if (jr != null && !(jr.error != null && jr.items.isEmpty())) {
+                    Jellyfin.cache = jr.items;
+                    Jellyfin.cacheTime = now;
+                }
+                List<Watching.Card> list = cards();
+                if (list.isEmpty()) {
+                    String error = pr != null && pr.error != null ? pr.error : jr != null ? jr.error : null;
+                    boolean anyCache = (plex && Plex.cache != null) || (jf && Jellyfin.cache != null);
+                    showPlexStatus(error != null && !anyCache ? error : "Nothing in progress right now.");
                     return;
                 }
-                Plex.cache = result.items;
-                Plex.cacheTime = SystemClock.elapsedRealtime();
-                renderPlex(result.items);
+                renderWatching(list);
             });
         }).start();
     }
@@ -310,9 +402,10 @@ public class MainActivity extends Activity {
         if (hadFocus) focusFirstApp();
     }
 
-    private void renderPlex(List<Plex.Item> items) {
+    private void renderWatching(List<Watching.Card> items) {
+        watchLabel.setText(Watching.title(this));
         if (items.isEmpty()) {
-            showPlexStatus("Nothing in progress on Plex right now.");
+            showPlexStatus(Watching.emptyMessage(this));
             return;
         }
         View focused = getCurrentFocus();
@@ -321,22 +414,22 @@ public class MainActivity extends Activity {
         plexStatus.setVisibility(View.GONE);
         plexScroll.setVisibility(View.VISIBLE);
         plexRow.removeAllViews();
-        for (Plex.Item item : items) {
-            plexRow.addView(plexCard(item), Ui.rowItemParams(this));
+        for (Watching.Card item : items) {
+            plexRow.addView(watchCard(item), Ui.rowItemParams(this));
         }
 
-        if (tag != null && tag.toString().startsWith("plex:")) {
+        if (tag != null && (tag.toString().startsWith("plex:") || tag.toString().startsWith("jf:"))) {
             View target = plexRow.findViewWithTag(tag);
             if (target == null) target = plexRow.getChildAt(0);
             target.requestFocus();
         }
     }
 
-    private View plexCard(final Plex.Item item) {
-        final int w = 195;
-        final int h = 110;
+    private View watchCard(final Watching.Card item) {
+        final int w = Watching.cardWidth(Prefs.cardSize(this));
+        final int h = Math.round(w * 110 / 195f);
         LinearLayout tile = Ui.baseTile(this);
-        tile.setTag("plex:" + item.machineId + ":" + item.ratingKey);
+        tile.setTag(item.key);
 
         FrameLayout card = Ui.card(this, w, h);
         card.setBackground(Ui.plainCardBackground(this));
@@ -345,6 +438,20 @@ public class MainActivity extends Activity {
         image.setBackgroundColor(Ui.CARD);
         card.addView(image, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        // PLEX or JELLYFIN in the corner
+        TextView badge = new TextView(this);
+        badge.setText("plex".equals(item.source) ? "PLEX" : "JELLYFIN");
+        badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9);
+        badge.setLetterSpacing(0.08f);
+        badge.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        badge.setTextColor(0xFF0C0F15);
+        badge.setBackground(Ui.rounded(this, 0xD9FFFFFF, 3, 0, 0));
+        badge.setPadding(Ui.dp(this, 5), Ui.dp(this, 1), Ui.dp(this, 5), Ui.dp(this, 1));
+        FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.LEFT);
+        bl.setMargins(Ui.dp(this, 6), Ui.dp(this, 6), 0, 0);
+        card.addView(badge, bl);
 
         // Progress bar along the bottom
         LinearLayout bar = new LinearLayout(this);
@@ -367,8 +474,8 @@ public class MainActivity extends Activity {
         tile.addView(meta);
 
         Ui.scaleOnFocus(tile, card);
-        tile.setOnClickListener(v -> Plex.open(this, item));
-        tile.setOnKeyListener((v, keyCode, event) -> onMenuKey(keyCode, event, () -> refreshPlex(true)));
+        tile.setOnClickListener(v -> Watching.open(this, item));
+        tile.setOnKeyListener((v, keyCode, event) -> onMenuKey(keyCode, event, () -> refreshWatching(true)));
         Plex.loadImage(item.imageUrl, image);
         return tile;
     }
@@ -379,7 +486,7 @@ public class MainActivity extends Activity {
     private void onFocusMoved(View v) {
         Object tag = v != null ? v.getTag() : null;
         if (tag instanceof String && (((String) tag).startsWith("app:") || ((String) tag).startsWith("plex:")
-                || tag.equals("choose")) && v instanceof ViewGroup && ((ViewGroup) v).getChildCount() > 0) {
+                || ((String) tag).startsWith("jf:") || tag.equals("choose")) && v instanceof ViewGroup && ((ViewGroup) v).getChildCount() > 0) {
             ring.moveTo(v, ((ViewGroup) v).getChildAt(0));
         } else {
             ring.hide();

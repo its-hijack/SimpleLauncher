@@ -40,18 +40,19 @@ It compares the release's tag with its own build (date first, then build number)
 `231126-2.9` and every new release needs a higher build. Only the latest published release is offered; drafts and
 pre-releases are ignored, and the APK must be signed with the same key as the copy on the TV.
 
-## Adding a supported device or a debloat item
+## Adding a supported device or a device extra
 
 Both lists are at the top of `SimpleScript.sh`:
 
 - `SUPPORTED_DEVICES`: one line per tested device (`model code|name|Fire OS version|debloat|HomeCatch`).
-  Only listed devices are offered Debloat, Restore and HomeCatch. Also add it to the table in `README.md`.
+  Only listed devices get HomeCatch and the device extras (Debloat and Restore, shown only in SimpleScript on
+  that device). Add it to the README table too, but keep the extras out of the README.
 - `DEBLOAT_LIST`: one line per app (`group|package|description|recommended y/n|disable or uninstall`).
   People who debloated before are asked about new lines next time, marked NEW.
 
-The Windows version (`windows/`, written in Go) reads both lists from `SimpleScript.sh` when it's built,
-so there's only one place to edit. Each release builds `SimpleScript.exe` and attaches it, along with
-`SimpleScript.sh`. To build it yourself: `bash windows/build.sh` (needs Go).
+The Windows version, `SimpleScript.ps1`, is made from `windows/SimpleScript.template.ps1` by
+`bash windows/build.sh`, which copies both lists in from `SimpleScript.sh`. Run it after changing either
+file and commit the result. Each release also runs it and attaches `SimpleScript.ps1` and `SimpleScript.sh`.
 
 ## The home screen picture in the README
 

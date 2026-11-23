@@ -28,16 +28,14 @@ and the shows you're part-way through.
 Every device can use SimpleLauncher. Extras that change how the device behaves are only switched on
 for devices that have been tested, so nothing can go wrong on the rest.
 
-| Device | Model code | Tested on | SimpleLauncher | HomeCatch | Debloat & Restore |
-|---|---|---|:---:|:---:|:---:|
-| Fire TV Stick HD | AFTSS | Fire OS 7 | ✓ | ✓ | ✓ |
-| Other Fire TV devices | | | ✓ (as an app) | Not yet | Not yet |
-| Android TV, Google TV, phones and tablets (Android 7.1+) | | | ✓ (as your home screen) | Not needed | Not offered |
+| Device | Model code | Tested on | SimpleLauncher | HomeCatch |
+|---|---|---|:---:|:---:|
+| Fire TV Stick HD | AFTSS | Fire OS 7 | ✓ | ✓ |
+| Other Fire TV devices | | | ✓ (as an app) | Not yet |
+| Android TV, Google TV, phones and tablets (Android 7.1+) | | | ✓ (as your home screen) | Not needed |
 
 - **HomeCatch** makes the Home button on a Fire TV remote open SimpleLauncher instead of Amazon's home
   screen. Other Android devices let you choose your home screen anyway, so they don't need it.
-- **Debloat** switches off Amazon's adverts, tracking and apps you choose. **Restore** switches them
-  all back on.
 
 Want your device supported? [Open an issue](../../issues) with its name and model code. SimpleScript
 shows the model code when it connects.
@@ -48,15 +46,18 @@ shows the model code when it connects.
 
 SimpleScript walks you through everything: it gets the tools your computer needs, helps you switch on
 ADB debugging on your TV, connects to it, and then installs SimpleLauncher (with HomeCatch on
-supported Fire TVs). On supported devices it can also debloat or restore your TV.
+supported Fire TVs).
 
 **Windows**
 
-1. Download **SimpleScript.exe** from the [latest release](../../releases/latest)
-   (**SimpleScript-arm64.exe** if your PC has an ARM processor, such as a Snapdragon laptop).
-2. Double-click it and follow the steps on screen.
-   Windows may say *"Windows protected your PC"* because the app isn't signed: select
-   **More info › Run anyway**.
+1. Download **SimpleScript.ps1** from the [latest release](../../releases/latest).
+   It's a plain PowerShell script, so you can open it in Notepad and read every line first.
+2. Right-click it and choose **Run with PowerShell**, then follow the steps on screen.
+
+   If Windows won't run it, open **PowerShell** and run:
+   ```
+   powershell -ExecutionPolicy Bypass -File "$HOME\Downloads\SimpleScript.ps1"
+   ```
 
 **macOS and Linux**
 
@@ -70,9 +71,6 @@ supported Fire TVs). On supported devices it can also debloat or restore your TV
 You'll need your computer and TV on the same network. If ADB isn't installed, SimpleScript offers to
 install it for you (with winget on Windows, Homebrew on a Mac, or by downloading it from Google) or
 tells you how to do it yourself.
-
-When debloating, you choose **y** or **n** for each item, or take the recommended set.
-SimpleScript remembers your answers, so next time it only asks about anything new.
 
 ### Installing the app yourself
 

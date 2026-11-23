@@ -162,7 +162,7 @@ public class AccentPickerActivity extends Screen {
         title.setPadding(Ui.dp(this, 7), 0, 0, 0);
         head.addView(title);
         cats.addView(head);
-        String[] names = {"Home screen", "Appearance", "Plex", "Danger Zone", "Information"};
+        String[] names = {"Home screen", "Appearance", "External Services", "Danger Zone", "Information"};
         for (String n : names) {
             boolean active = n.equals("Appearance");
             TextView t = text(n, 11, active ? Color.WHITE : 0xFF8A93A6);

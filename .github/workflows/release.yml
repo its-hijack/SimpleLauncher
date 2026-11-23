@@ -71,13 +71,8 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "$FILE"
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Build SimpleScript for Windows
-        run: |
-          bash windows/build.sh
+      - name: Make SimpleScript for Windows (copies in the lists from SimpleScript.sh)
+        run: bash windows/build.sh
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
@@ -87,7 +82,6 @@ jobs:
           name: SimpleLauncher ${{ steps.version.outputs.release }} (build ${{ steps.version.outputs.build }})
           files: |
             ${{ steps.apk.outputs.file }}
-            windows/SimpleScript.exe
-            windows/SimpleScript-arm64.exe
+            SimpleScript.ps1
             SimpleScript.sh
           generate_release_notes: true

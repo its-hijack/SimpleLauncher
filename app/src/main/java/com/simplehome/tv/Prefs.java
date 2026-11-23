@@ -32,6 +32,13 @@ final class Prefs {
     static final String PASS_UNTIL_HOME = "amazon_pass_until_home";
     static final String SETUP_DONE = "setup_done";
     static final String MODE_OVERRIDE = "mode_override";
+    static final String LAYOUT_GRID = "home_layout_grid";
+    static final String APP_SIZE = "home_app_size";
+    static final String CARD_SIZE = "home_card_size";
+    static final String PLEX_IN_ROW = "plex_in_row";
+    static final String JELLYFIN_IN_ROW = "jellyfin_in_row";
+    static final String SETUP_PLEX = "setup_connect_plex";
+    static final String SETUP_JELLYFIN = "setup_connect_jellyfin";
 
     static final int DEFAULT_BACKGROUND = 0xFF0C0F15;
 
@@ -95,6 +102,32 @@ final class Prefs {
     /** True: Amazon Home pauses the catcher until you open SimpleLauncher again. */
     static boolean passUntilHome(Context c) {
         return get(c).getBoolean(PASS_UNTIL_HOME, false);
+    }
+
+    // ---- home screen layout and sizes (0 = smallest … 4 = largest)
+    static boolean gridLayout(Context c) {
+        return get(c).getBoolean(LAYOUT_GRID, false);
+    }
+
+    static int appSize(Context c) {
+        return get(c).getInt(APP_SIZE, 2);
+    }
+
+    static int cardSize(Context c) {
+        return get(c).getInt(CARD_SIZE, 2);
+    }
+
+    static void setInt(Context c, String key, int value) {
+        get(c).edit().putInt(key, value).apply();
+    }
+
+    // ---- which services fill Continue Watching
+    static boolean plexInRow(Context c) {
+        return get(c).getBoolean(PLEX_IN_ROW, true);
+    }
+
+    static boolean jellyfinInRow(Context c) {
+        return get(c).getBoolean(JELLYFIN_IN_ROW, true);
     }
 
     static boolean setupDone(Context c) {

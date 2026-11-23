@@ -2,7 +2,7 @@
 # =====================================================================================
 #  SimpleScript, by Cherry Universe
 #  Sets up SimpleLauncher on your TV, step by step: gets the tools your computer needs,
-#  connects to your TV, then lets you debloat it, restore it, or install SimpleLauncher.
+#  connects to your TV, then installs SimpleLauncher. Supported devices get extras.
 #
 #  Run it from Terminal:   bash SimpleScript.sh
 #  Works on macOS and Linux.
@@ -485,18 +485,17 @@ detect_device() {
   case "$SUPPORT" in
     full)
       ok "Supported device"
-      [ "$CAN_DEBLOAT" = "yes" ] && ok "Debloat and Restore available"
+      [ "$CAN_DEBLOAT" = "yes" ] && ok "Extras for this device: Debloat and Restore"
       [ "$CAN_HOMECATCH" = "yes" ] && ok "HomeCatch available ${D}(the Home button opens SimpleLauncher)${R}"
       ;;
     app)
       warn "$SUPPORT_REASON"
-      note "You can install SimpleLauncher as an app. Debloat and HomeCatch stay off on"
-      note "devices that haven't been tested, so nothing can go wrong."
+      note "You can install SimpleLauncher as an app. HomeCatch stays off on devices"
+      note "that haven't been tested yet, so nothing can go wrong."
       note "Want it supported? Tell us the model ($MODEL) at $REPO_URL/issues"
       ;;
     generic)
       ok "SimpleLauncher can be your home screen on this device"
-      note "Debloat and HomeCatch are only for supported Fire TV devices."
       ;;
   esac
 
@@ -889,19 +888,17 @@ menu() {
     else
       n=$((n+1)); actions+=("install"); say "  $n) Install SimpleLauncher"
     fi
-    if [ "$SUPPORT" = "full" ] && [ "$CAN_DEBLOAT" = "yes" ]; then
-      n=$((n+1)); actions+=("debloat"); say "  $n) Debloat ${D}(choose what to switch off)${R}"
-      n=$((n+1)); actions+=("restore"); say "  $n) Restore to stock"
-    elif sl_installed; then
+    if sl_installed && ! { [ "$SUPPORT" = "full" ] && [ "$CAN_DEBLOAT" = "yes" ]; }; then
       n=$((n+1)); actions+=("uninstall"); say "  $n) Remove SimpleLauncher"
     fi
     n=$((n+1)); actions+=("reboot"); say "  $n) Restart the TV"
-    say "  q) Quit"
-    if [ "$SUPPORT" = "app" ]; then
-      dim "  Debloat isn't offered because this Fire TV hasn't been tested with SimpleScript."
-    elif [ "$SUPPORT" = "generic" ]; then
-      dim "  Debloat is only for supported Fire TV devices."
+    if [ "$SUPPORT" = "full" ] && [ "$CAN_DEBLOAT" = "yes" ]; then
+      blank
+      say "  ${B}Extras for your $SUPPORTED_NAME${R}"
+      n=$((n+1)); actions+=("debloat"); say "  $n) Debloat ${D}(choose what to switch off)${R}"
+      n=$((n+1)); actions+=("restore"); say "  $n) Restore to stock"
     fi
+    say "  q) Quit"
     blank
     choose "Choose 1-$n:" "$n"
     [ "$CHOICE" = "q" ] && break

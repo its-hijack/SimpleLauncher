@@ -182,9 +182,15 @@ final class Ui {
 
     /** An app tile: banner (or icon) in a card, name underneath. */
     static Tile appTile(Context c, Apps.Entry e) {
+        return appTile(c, e, TILE_W);
+    }
+
+    /** An app tile at a given width in dp (the height keeps the TV banner shape). */
+    static Tile appTile(Context c, Apps.Entry e, int w) {
+        int h = Math.round(w * TILE_H / (float) TILE_W);
         Tile t = new Tile();
         t.root = baseTile(c);
-        t.card = card(c, TILE_W, TILE_H);
+        t.card = card(c, w, h);
         ImageView image = new ImageView(c);
         if (e.banner != null) {
             image.setImageDrawable(copyOf(e.banner));
@@ -194,19 +200,25 @@ final class Ui {
         } else {
             image.setImageDrawable(copyOf(e.icon));
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            t.card.addView(image, new FrameLayout.LayoutParams(dp(c, 44), dp(c, 44), Gravity.CENTER));
+            int icon = Math.round(44f * w / TILE_W);
+            t.card.addView(image, new FrameLayout.LayoutParams(dp(c, icon), dp(c, icon), Gravity.CENTER));
         }
-        t.root.addView(t.card, new LinearLayout.LayoutParams(dp(c, TILE_W), dp(c, TILE_H)));
-        t.root.addView(label(c, e.label, TILE_W));
+        t.root.addView(t.card, new LinearLayout.LayoutParams(dp(c, w), dp(c, h)));
+        t.root.addView(label(c, e.label, w));
         scaleOnFocus(t.root, t.card);
         return t;
     }
 
     /** A tile with text instead of a banner (e.g. "Choose apps"). */
     static Tile textTile(Context c, String big, String caption) {
+        return textTile(c, big, caption, TILE_W);
+    }
+
+    static Tile textTile(Context c, String big, String caption, int w) {
+        int h = Math.round(w * TILE_H / (float) TILE_W);
         Tile t = new Tile();
         t.root = baseTile(c);
-        t.card = card(c, TILE_W, TILE_H);
+        t.card = card(c, w, h);
         TextView text = new TextView(c);
         text.setText(big);
         text.setGravity(Gravity.CENTER);
@@ -216,8 +228,8 @@ final class Ui {
         text.setDuplicateParentStateEnabled(true);
         t.card.addView(text, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        t.root.addView(t.card, new LinearLayout.LayoutParams(dp(c, TILE_W), dp(c, TILE_H)));
-        t.root.addView(label(c, caption, TILE_W));
+        t.root.addView(t.card, new LinearLayout.LayoutParams(dp(c, w), dp(c, h)));
+        t.root.addView(label(c, caption, w));
         scaleOnFocus(t.root, t.card);
         return t;
     }

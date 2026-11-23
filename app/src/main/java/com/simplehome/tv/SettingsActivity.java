@@ -44,6 +44,9 @@ public class SettingsActivity extends Screen {
     private String returnFocusTo;   // option to re-select after coming back from a picker
     private boolean modeOpen;        // "Running in" drop-down
     private String lastCategory;     // for the fade/slide when switching category
+    private String service;          // External Services: null = the list, or "plex" / "jellyfin"
+    private JellyfinLogin jellyfinLogin;
+    private LayoutPreview preview;   // Home screen: the little home screen
 
     private interface Toggle {
         void set(boolean on);
@@ -68,12 +71,12 @@ public class SettingsActivity extends Screen {
 
     // ------------------------------------------------------------------ categories
 
-    /** Which categories to show: the Plex one only while Plex is installed. */
+    /** Which categories to show: External Services only while Plex or Jellyfin is installed. */
     private List<String> wantedCategories() {
         List<String> list = new ArrayList<>();
         list.add("Home screen");
         list.add("Appearance");
-        if (Plex.installed(this)) list.add("Plex");
+        if (Watching.available(this)) list.add("External Services");
         list.add("Danger Zone");
         list.add("Information");
         return list;
@@ -123,6 +126,7 @@ public class SettingsActivity extends Screen {
                 if (hasFocus && !rendering && !category.equals(current)) {
                     current = category;
                     modeOpen = false;
+                    leaveService();
                     render();
                 }
             });
@@ -188,7 +192,7 @@ public class SettingsActivity extends Screen {
             switch (current) {
                 case "Home screen": homeScreen(); break;
                 case "Appearance": appearance(); break;
-                case "Plex": plex(); break;
+                case "External Services": externalServices(); break;
                 case "Danger Zone": dangerZone(); break;
                 default: information(); break;
             }
@@ -212,22 +216,180 @@ public class SettingsActivity extends Screen {
     }
 
     private void homeScreen() {
-        section("HOME SCREEN ROWS", true);
+        // Layout and the two sizes on the left, with a little home screen on the right that follows along.
+        LinearLayout split = new LinearLayout(this);
+        split.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout left = new LinearLayout(this);
+        left.setOrientation(LinearLayout.VERTICAL);
+        split.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(Ui.dp(this, 220), ViewGroup.LayoutParams.WRAP_CONTENT);
+        rlp.setMargins(Ui.dp(this, 18), 0, 0, 0);
+        split.addView(right, rlp);
+        list.addView(split, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout outer = list;
+        list = left;   // the row helpers add to "list": point them at the left column for now
+        try {
+            section("LAYOUT", true);
+            layoutRow();
+            sizeRow("app_size", "App size", Prefs.APP_SIZE, Prefs.appSize(this));
+            if (Watching.available(this)) {
+                sizeRow("card_size", "Continue Watching size", Prefs.CARD_SIZE, Prefs.cardSize(this));
+            }
+            TextView tip = new TextView(this);
+            tip.setText("Highlight a size and press left or right on the remote.");
+            tip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            tip.setTextColor(0xFF8A93A6);
+            tip.setPadding(Ui.dp(this, 2), Ui.dp(this, 6), 0, 0);
+            list.addView(tip);
+        } finally {
+            list = outer;
+        }
+
+        TextView label = new TextView(this);
+        label.setText("PREVIEW");
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+        label.setLetterSpacing(0.15f);
+        label.setTextColor(0xFF8A93A6);
+        label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        label.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 6));
+        right.addView(label);
+        preview = new LayoutPreview(this);
+        right.addView(preview, new LinearLayout.LayoutParams(Ui.dp(this, 220), Ui.dp(this, 124)));
+        updatePreview();
+
+        section("HOME SCREEN ROWS", false);
         toggleRow("apps", "Your apps", null, Prefs.showApps(this), on -> Prefs.setBool(this, Prefs.SHOW_APPS, on));
-        if (Plex.installed(this)) {
-            toggleRow("plex_row", "Continue Watching (Plex)",
-                    Prefs.plexToken(this) == null ? "Sign in to Plex in the Plex category to fill this row" : null,
-                    Prefs.showPlex(this), on -> Prefs.setBool(this, Prefs.SHOW_PLEX, on));
+        if (Watching.available(this)) {
+            toggleRow("plex_row", "Continue Watching", "Shows you're part-way through", Prefs.showPlex(this),
+                    on -> Prefs.setBool(this, Prefs.SHOW_PLEX, on));
+            valueRow("shows_from", "Shows from", "Choose in External Services", servicesSummary() + " \u203A", () -> {
+                current = "External Services";
+                leaveService();
+                render();
+                focusFirstOption();
+            });
         } else {
             ToggleView off = new ToggleView(this);
             off.setOn(false);
-            View row = addRow("plex_row", "Continue Watching (Plex)", "Install Plex to use this row", off,
-                    () -> Apps.toast(this, "Install the Plex app to use this row"));
+            View row = addRow("plex_row", "Continue Watching", "Install Plex or Jellyfin to use this row", off,
+                    () -> Apps.toast(this, "Install the Plex or Jellyfin app to use this row"));
             row.setAlpha(0.45f);
         }
-        section("YOUR APPS", false);
-        valueRow("choose", "Choose your apps", "Pick and order the apps on your home screen", "Open",
-                () -> Screen.open(this, new Intent(this, AppSelectionActivity.class)));
+    }
+
+    private void updatePreview() {
+        if (preview != null) {
+            preview.set(Prefs.gridLayout(this), Prefs.appSize(this), Prefs.cardSize(this),
+                    Prefs.showApps(this), Watching.shown(this));
+        }
+    }
+
+    /** Default or Grid: Select, left or right switches between them. */
+    private void layoutRow() {
+        LinearLayout pills = new LinearLayout(this);
+        pills.setOrientation(LinearLayout.HORIZONTAL);
+        pills.setDuplicateParentStateEnabled(true);
+        final TextView def = pill("Default");
+        final TextView grid = pill("Grid");
+        pills.addView(def);
+        LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        gl.setMargins(Ui.dp(this, 6), 0, 0, 0);
+        pills.addView(grid, gl);
+        final Runnable paint = () -> {
+            boolean g = Prefs.gridLayout(this);
+            stylePill(def, !g);
+            stylePill(grid, g);
+        };
+        paint.run();
+        final Runnable flip = () -> {
+            Prefs.setBool(this, Prefs.LAYOUT_GRID, !Prefs.gridLayout(this));
+            paint.run();
+            updatePreview();
+        };
+        View row = addRow("layout", "Layout", null, pills, flip);
+        row.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode != android.view.KeyEvent.KEYCODE_DPAD_LEFT && keyCode != android.view.KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                boolean wantGrid = keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT;
+                if (wantGrid != Prefs.gridLayout(this)) flip.run();
+            }
+            return true;
+        });
+    }
+
+    private TextView pill(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        t.setPadding(Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        return t;
+    }
+
+    private void stylePill(TextView t, boolean chosen) {
+        t.setBackground(Ui.rounded(this, chosen ? Ui.accent(this) : 0x33808A9C, 12, 0, 0));
+        t.setTextColor(chosen && Ui.accent(this) == 0xFFF2F4F7 ? DARK_TEXT : Color.WHITE);
+    }
+
+    /** A five-step size: left and right on the remote change it. */
+    private void sizeRow(String tag, String label, final String key, int start) {
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.HORIZONTAL);
+        right.setGravity(Gravity.CENTER_VERTICAL);
+        right.setDuplicateParentStateEnabled(true);
+        final View[] dots = new View[5];
+        for (int i = 0; i < 5; i++) {
+            dots[i] = new View(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(this, 14), Ui.dp(this, 6));
+            lp.setMargins(Ui.dp(this, 3), 0, 0, 0);
+            right.addView(dots[i], lp);
+        }
+        final TextView name = new TextView(this);
+        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        name.setTextColor(Ui.focusColors(DARK_TEXT, Ui.TEXT_DIM));
+        name.setDuplicateParentStateEnabled(true);
+        name.setMinWidth(Ui.dp(this, 64));
+        name.setGravity(Gravity.RIGHT);
+        right.addView(name);
+
+        final int[] value = {Watching.clamp(start)};
+        final Runnable paint = () -> {
+            for (int i = 0; i < 5; i++) {
+                dots[i].setBackground(Ui.rounded(this, i <= value[0] ? Ui.accent(this) : 0x55808A9C, 3, 0, 0));
+            }
+            name.setText(Watching.SIZE_NAMES[value[0]]);
+        };
+        paint.run();
+        View row = addRow(tag, label, null, right, () -> {
+            value[0] = (value[0] + 1) % 5;   // Select steps through the sizes too
+            Prefs.setInt(this, key, value[0]);
+            paint.run();
+            updatePreview();
+        });
+        row.setOnKeyListener((v, keyCode, event) -> {
+            int step = keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT ? 1
+                    : keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 0;
+            if (step == 0) return false;
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                int next = Watching.clamp(value[0] + step);
+                if (next != value[0]) {
+                    value[0] = next;
+                    Prefs.setInt(this, key, next);
+                    paint.run();
+                    updatePreview();
+                }
+            }
+            return true;
+        });
+    }
+
+    private String servicesSummary() {
+        boolean p = Plex.installed(this), j = Jellyfin.installed(this);
+        if (p && j) return "Plex and Jellyfin";
+        return p ? "Plex" : "Jellyfin";
     }
 
     private void appearance() {
@@ -285,14 +447,96 @@ public class SettingsActivity extends Screen {
                 () -> Mode.openOriginalHome(this));
     }
 
-    private void plex() {
+    // ------------------------------------------------------------------ External Services
+
+    private void leaveService() {
+        service = null;
+        if (jellyfinLogin != null) {
+            jellyfinLogin.cancel();
+            jellyfinLogin = null;
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        // Inside Plex or Jellyfin: Back goes to the External Services list first.
+        if (service != null && "External Services".equals(current)) {
+            String was = service;
+            leaveService();
+            returnFocusTo = "service:" + was;
+            render();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private void externalServices() {
+        if ("plex".equals(service) && Plex.installed(this)) {
+            plexPage();
+            return;
+        }
+        if ("jellyfin".equals(service) && Jellyfin.installed(this)) {
+            jellyfinPage();
+            return;
+        }
+        service = null;
+        section("YOUR SERVICES", true);
+        TextView about = new TextView(this);
+        about.setText("Services that fill the Continue Watching row. Select one to sign in or change its settings.");
+        about.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        about.setTextColor(Ui.TEXT_DIM);
+        about.setPadding(Ui.dp(this, 2), 0, 0, Ui.dp(this, 2));
+        list.addView(about);
+        if (Plex.installed(this)) {
+            boolean in = Prefs.plexToken(this) != null;
+            String user = Prefs.plexUser(this);
+            serviceRow("plex", "Plex",
+                    in ? "Signed in" + (user != null ? " as " + user : "") + (Prefs.plexInRow(this) ? " \u00B7 In Continue Watching" : " \u00B7 Hidden from Continue Watching")
+                            : "Not signed in",
+                    in ? "Signed in" : "Sign in");
+        }
+        if (Jellyfin.installed(this)) {
+            boolean in = Jellyfin.signedIn(this);
+            serviceRow("jellyfin", "Jellyfin",
+                    in ? Jellyfin.serverName(this) + (Prefs.jellyfinInRow(this) ? " \u00B7 In Continue Watching" : " \u00B7 Hidden from Continue Watching")
+                            : "Not signed in",
+                    in ? "Signed in" : "Sign in");
+        }
+        section("ON THE HOME SCREEN", false);
+        String title = Watching.title(this);
+        valueRow("row_title", "Row title", "Changes with the services you use",
+                title.charAt(0) + title.substring(1).toLowerCase(java.util.Locale.UK)
+                        .replace("(plex)", "(Plex)").replace("(jellyfin)", "(Jellyfin)"), null);
+    }
+
+    private void serviceRow(final String id, String name, String hint, String status) {
+        valueRow("service:" + id, name, hint, status + " \u203A", () -> {
+            service = id;
+            render();
+            focusFirstOption();
+        });
+    }
+
+    private void breadcrumb(String name) {
+        TextView t = new TextView(this);
+        t.setText("External Services  \u203A  " + name);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        t.setTextColor(Ui.TEXT_DIM);
+        t.setPadding(Ui.dp(this, 2), Ui.dp(this, 4), 0, 0);
+        list.addView(t);
+    }
+
+    private void plexPage() {
+        breadcrumb("Plex");
         boolean signedIn = Prefs.plexToken(this) != null;
         String user = Prefs.plexUser(this);
-        section("ACCOUNT", true);
+        section("ACCOUNT", false);
         if (signedIn) {
             valueRow("plex", "Plex account", "Signed in" + (user != null ? " as " + user : ""), "Sign out", this::plexSignOut);
+            toggleRow("plex_in_row", "Show in Continue Watching", null, Prefs.plexInRow(this),
+                    on -> Prefs.setBool(this, Prefs.PLEX_IN_ROW, on));
         } else {
-            valueRow("plex", "Plex account", "Needed for the Continue Watching (Plex) row", "Sign in", this::plexSignIn);
+            valueRow("plex", "Plex account", "Needed for Continue Watching", "Sign in", this::plexSignIn);
         }
         if (signedIn) plexContinueWatching();
         String servers = Plex.serverNames(this);
@@ -300,6 +544,172 @@ public class SettingsActivity extends Screen {
                 {"Plex app", Plex.appVersion(this)},
                 {"Account", !signedIn ? "Not signed in" : "Signed in" + (user != null ? " as " + user : "")},
                 {"Server", !signedIn ? "Sign in first" : servers != null ? servers : "Not connected yet"}});
+    }
+
+    private void jellyfinPage() {
+        breadcrumb("Jellyfin");
+        if (Jellyfin.signedIn(this)) {
+            if (jellyfinLogin != null) {
+                jellyfinLogin.cancel();
+                jellyfinLogin = null;
+            }
+            String user = Jellyfin.user(this);
+            section("ACCOUNT", false);
+            valueRow("jellyfin", "Jellyfin account", "Signed in" + (user != null ? " as " + user : "") + " on " + Jellyfin.serverName(this),
+                    "Sign out", this::jellyfinSignOut);
+            toggleRow("jf_in_row", "Show in Continue Watching", null, Prefs.jellyfinInRow(this),
+                    on -> Prefs.setBool(this, Prefs.JELLYFIN_IN_ROW, on));
+            section("CONTINUE WATCHING", false);
+            valueRow("jf_open", "When you select a show", "Opens the Jellyfin app, where it's first in Continue Watching. "
+                    + "Jellyfin's TV app can't be opened straight to one show yet.", "Open Jellyfin", null);
+            valueRow("jf_refresh", "Refresh now", "Fetch the latest from your Jellyfin server", "Refresh", this::jellyfinRefresh);
+            infoGroup("JELLYFIN STATUS", false, new String[][]{
+                    {"Jellyfin app", Jellyfin.appVersion(this)},
+                    {"Account", "Signed in" + (user != null ? " as " + user : "")},
+                    {"Server", Jellyfin.serverName(this) + " \u00B7 " + Jellyfin.server(this).replaceFirst("^https?://", "")}});
+            return;
+        }
+
+        // Signing in, on the page itself.
+        if (jellyfinLogin == null) {
+            jellyfinLogin = new JellyfinLogin(this, new JellyfinLogin.Listener() {
+                @Override
+                public void changed() {
+                    if (!isDestroyed() && "jellyfin".equals(service)) {
+                        render();
+                        if (getCurrentFocus() == null || !isInside(getCurrentFocus(), list)) focusFirstOption();
+                    }
+                }
+
+                @Override
+                public void signedIn() {
+                    Jellyfin.clearCache();
+                    if (!isDestroyed()) render();
+                }
+            });
+            jellyfinLogin.search();
+            return;   // search() redraws
+        }
+        JellyfinLogin login = jellyfinLogin;
+        switch (login.stage) {
+            case SEARCHING:
+                section("SERVER", false);
+                valueRow("jf_wait", "Looking for Jellyfin servers on your network\u2026", null, "", null);
+                break;
+            case SERVERS:
+                section(login.servers.isEmpty() ? "SERVER" : "SERVERS FOUND ON YOUR NETWORK", false);
+                if (login.servers.isEmpty()) {
+                    valueRow("jf_none", "No servers found", "Check the server is on and on the same network, or type its address", "", null);
+                }
+                for (final Jellyfin.Server srv : login.servers) {
+                    valueRow("jf_srv:" + srv.address, srv.name, srv.address.replaceFirst("^https?://", ""), "Choose \u203A",
+                            () -> login.choose(srv));
+                }
+                valueRow("jf_type", "Type the server's address", "If yours isn't listed, e.g. 192.168.1.10:8096", "Type \u203A",
+                        login::typeAddress);
+                valueRow("jf_search", "Search again", null, "Search", login::search);
+                break;
+            case CONNECTING:
+                section("SIGN IN", false);
+                valueRow("jf_wait", login.message, null, "", null);
+                break;
+            case CODE:
+                section("SERVER", false);
+                valueRow("jf_server", login.server.name, login.server.address.replaceFirst("^https?://", ""), "Change", login::search);
+                section("SIGN IN", false);
+                if (login.code != null) {
+                    codeCard(login.code.code);
+                    valueRow("jf_password", "Use a username and password", null, "\u203A",
+                            () -> login.askPassword("Sign in with your Jellyfin username and password."));
+                } else {
+                    valueRow("jf_password", "Sign in with a username and password", null, "\u203A",
+                            () -> login.askPassword("Sign in with your Jellyfin username and password."));
+                }
+                break;
+            case ERROR:
+                section("SIGN IN", false);
+                valueRow("jf_error", "Something went wrong", login.message, "", null);
+                valueRow("jf_retry", "Try again", null, "\u203A", () -> {
+                    if (login.server != null) login.choose(login.server);
+                    else login.search();
+                });
+                valueRow("jf_restart", "Choose a different server", null, "\u203A", login::search);
+                break;
+            case DONE:
+                break;
+        }
+        section("WHEN YOU SELECT A SHOW", false);
+        valueRow("jf_open", "Opens the Jellyfin app", "Jellyfin's TV app can't be opened straight to one show yet, "
+                + "but it's first in Jellyfin's own Continue Watching.", "", null);
+    }
+
+    /** The Quick Connect code, big, with what to do with it. */
+    private void codeCard(String code) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(Ui.rounded(this, ROW, 10, 0, 0));
+        card.setPadding(Ui.dp(this, 18), Ui.dp(this, 14), Ui.dp(this, 18), Ui.dp(this, 14));
+        card.setFocusable(true);
+        card.setTag("jf_code");
+        card.setNextFocusLeftId(currentCategoryView().getId());
+        TextView head = new TextView(this);
+        head.setText("Sign in with Quick Connect");
+        head.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        head.setTextColor(Color.WHITE);
+        card.addView(head);
+        TextView how = new TextView(this);
+        how.setText("On your phone or computer, open Jellyfin and sign in. Go to your profile \u203A Quick Connect and enter this code.");
+        how.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        how.setTextColor(Ui.TEXT_DIM);
+        how.setLineSpacing(0, 1.2f);
+        how.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 10));
+        card.addView(how);
+        TextView digits = new TextView(this);
+        digits.setText(code);
+        digits.setTextSize(TypedValue.COMPLEX_UNIT_SP, 34);
+        digits.setLetterSpacing(0.3f);
+        digits.setTextColor(Color.WHITE);
+        card.addView(digits);
+        TextView wait = new TextView(this);
+        wait.setText("Waiting for you to approve it\u2026");
+        wait.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        wait.setTextColor(Ui.TEXT_DIM);
+        wait.setPadding(0, Ui.dp(this, 6), 0, 0);
+        card.addView(wait);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, Ui.dp(this, 5), 0, 0);
+        list.addView(card, lp);
+    }
+
+    private void jellyfinSignOut() {
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Sign out of Jellyfin?")
+                .setMessage("Jellyfin shows will leave Continue Watching until you sign in again.")
+                .setPositiveButton("Sign out", (d, w) -> {
+                    Jellyfin.signOut(this);
+                    render();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void jellyfinRefresh() {
+        Apps.toast(this, "Refreshing from Jellyfin\u2026");
+        final Context app = getApplicationContext();
+        new Thread(() -> {
+            final Jellyfin.Result r = Jellyfin.continueWatching(app);
+            main.post(() -> {
+                if (r.error != null && r.items.isEmpty()) {
+                    Apps.toast(app, r.error);
+                } else {
+                    Jellyfin.cache = r.items;
+                    Jellyfin.cacheTime = SystemClock.elapsedRealtime();
+                    Apps.toast(app, "Jellyfin: " + r.items.size() + (r.items.size() == 1 ? " show" : " shows") + " to continue");
+                }
+                if (!isDestroyed()) render();
+            });
+        }).start();
     }
 
     private void plexContinueWatching() {
@@ -681,7 +1091,7 @@ public class SettingsActivity extends Screen {
     private void plexSignOut() {
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Sign out of Plex?")
-                .setMessage("The Continue Watching (Plex) row will be empty until you sign in again.")
+                .setMessage("Plex shows will leave Continue Watching until you sign in again.")
                 .setPositiveButton("Sign out", (d, w) -> {
                     Prefs.setPlex(this, null, null);
                     Plex.clearCache();
