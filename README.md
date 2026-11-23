@@ -37,13 +37,23 @@ shows the model code when it connects.
 
 ## How to install
 
-### The easy way: SimpleScript (macOS and Linux)
+### The easy way: SimpleScript (Windows, macOS and Linux)
 
 SimpleScript walks you through everything: it gets the tools your computer needs, helps you switch on
 ADB debugging on your TV, connects to it, and then installs SimpleLauncher (with HomeCatch on
 supported Fire TVs). On supported devices it can also debloat or restore your TV.
 
-1. Download **[SimpleScript.sh](SimpleScript.sh)** (select **Download raw file**).
+**Windows**
+
+1. Download **SimpleScript.exe** from the [latest release](../../releases/latest)
+   (**SimpleScript-arm64.exe** if your PC has an ARM processor, such as a Snapdragon laptop).
+2. Double-click it and follow the steps on screen.
+   Windows may say *"Windows protected your PC"* because the app isn't signed: select
+   **More info › Run anyway**.
+
+**macOS and Linux**
+
+1. Download **SimpleScript.sh** from the [latest release](../../releases/latest).
 2. Open **Terminal** and run:
    ```
    bash ~/Downloads/SimpleScript.sh
@@ -51,8 +61,8 @@ supported Fire TVs). On supported devices it can also debloat or restore your TV
 3. Follow the steps on screen.
 
 You'll need your computer and TV on the same network. If ADB isn't installed, SimpleScript offers to
-install it for you (with Homebrew on a Mac, or by downloading it from Google) or tells you how to do
-it yourself.
+install it for you (with winget on Windows, Homebrew on a Mac, or by downloading it from Google) or
+tells you how to do it yourself.
 
 When debloating, you choose **y** or **n** for each item, or take the recommended set.
 SimpleScript remembers your answers, so next time it only asks about anything new.

@@ -48,3 +48,7 @@ Both lists are at the top of `SimpleScript.sh`:
   Only listed devices are offered Debloat, Restore and HomeCatch. Also add it to the table in `README.md`.
 - `DEBLOAT_LIST`: one line per app (`group|package|description|recommended y/n|disable or uninstall`).
   People who debloated before are asked about new lines next time, marked NEW.
+
+The Windows version (`windows/`, written in Go) reads both lists from `SimpleScript.sh` when it's built,
+so there's only one place to edit. Each release builds `SimpleScript.exe` and attaches it, along with
+`SimpleScript.sh`. To build it yourself: `bash windows/build.sh` (needs Go).
