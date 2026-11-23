@@ -1,0 +1,78 @@
+# Builds SimpleLauncher and publishes it as a GitHub Release.
+#
+# To release a new build:
+#   1. In app/build.gradle raise versionCode by 1 and set buildDate / buildVersion
+#      (and releaseVersion for a new outward version such as V2).
+#   2. Push a tag named after the internal build, e.g. 231126-2.7
+# GitHub then builds the app, signs it and attaches SimpleLauncher-V1-231126-2.7.apk.
+#
+# One-time setup (repository Settings > Secrets and variables > Actions):
+#   SIGNING_KEYSTORE_BASE64  the signing key, base64-encoded (see RELEASING.md)
+
+name: Build and release
+
+on:
+  push:
+    tags: ['*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Read the version
+        id: version
+        run: |
+          RELEASE=$(grep -oP "def releaseVersion = '\K[^']+" app/build.gradle)
+          BUILD="$(grep -oP "def buildDate = '\K[^']+" app/build.gradle)-$(grep -oP "def buildVersion = '\K[^']+" app/build.gradle)"
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "$BUILD" ]; then
+            echo "::warning::Tag ${GITHUB_REF_NAME} doesn't match the build in app/build.gradle ($BUILD)."
+          fi
+
+      - name: Restore the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Add the SIGNING_KEYSTORE_BASE64 secret first (see RELEASING.md)."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing.keystore"
+
+      - name: Build
+        env:
+          SIGNING_STORE_FILE: ${{ runner.temp }}/signing.keystore
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Name the app file
+        id: apk
+        run: |
+          FILE="SimpleLauncher-${{ steps.version.outputs.release }}-${{ steps.version.outputs.build }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$FILE"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: SimpleLauncher ${{ steps.version.outputs.release }} (build ${{ steps.version.outputs.build }})
+          files: ${{ steps.apk.outputs.file }}
+          generate_release_notes: true

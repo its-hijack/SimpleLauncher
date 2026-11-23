@@ -1,0 +1,75 @@
+plugins {
+    id 'com.android.application'
+}
+
+// ---------------------------------------------------------------------------------------
+// SimpleLauncher by Cherry Universe: version numbers
+//
+// releaseVersion: the outward version people see (V1, V2, ...).
+// buildDate + buildVersion: the internal build, e.g. 231126-2.7 (DDMMYY-build).
+// The GitHub release tag is the internal build, e.g. 231126-2.7.
+// Raise versionCode by 1 for every build you install or release.
+// ---------------------------------------------------------------------------------------
+def releaseVersion = 'V1'
+def buildDate = '231126'
+def buildVersion = '2.7'
+
+android {
+    namespace 'com.simplehome.tv'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.simplehome.tv'
+        minSdk 25          // Fire OS 6+
+        targetSdk 28       // Fire OS 7 (Android 9)
+        versionCode 11
+        versionName "${releaseVersion} (${buildDate}-${buildVersion})"
+
+        // Shown in Settings → Information
+        buildConfigField 'String', 'RELEASE_VERSION', "\"${releaseVersion}\""
+        buildConfigField 'String', 'BUILD_TAG', "\"${buildDate}-${buildVersion}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // Release builds made on GitHub are signed with the key stored in the repository's
+    // secrets (see .github/workflows/release.yml). Built on your own computer without
+    // those settings, a release build falls back to your normal debug key.
+    signingConfigs {
+        release {
+            def store = System.getenv('SIGNING_STORE_FILE')
+            if (store != null && file(store).exists()) {
+                storeFile file(store)
+                storePassword System.getenv('SIGNING_STORE_PASSWORD') ?: 'android'
+                keyAlias System.getenv('SIGNING_KEY_ALIAS') ?: 'androiddebugkey'
+                keyPassword System.getenv('SIGNING_KEY_PASSWORD') ?: 'android'
+            } else {
+                def debugStore = file("${System.getProperty('user.home')}/.android/debug.keystore")
+                storeFile debugStore
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}
+// No external libraries: keeps the app tiny and fast on the Fire TV Stick.
