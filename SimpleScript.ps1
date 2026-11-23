@@ -27,7 +27,7 @@ $RepoUrl = "https://github.com/$Repo"
 # Supported devices: model code | name | Fire OS version tested | extras | HomeCatch
 $SupportedDevices = @(
     'AFTSS|Fire TV Stick HD|7|yes|yes',
-    'AFTARK|Fire TV Stick 4K Max (2nd Gen)|8|no|yes'
+    'AFTKRT|Fire TV Stick 4K Max (2nd Gen)|8|no|yes'
 )
 
 # Devices being tested: HomeCatch only. model code | name | Fire OS version (* = any)

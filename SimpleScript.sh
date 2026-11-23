@@ -31,7 +31,7 @@ DATA_DIR="$HOME/.simplescript"
 # -------------------------------------------------------------------------------------
 SUPPORTED_DEVICES=(
   "AFTSS|Fire TV Stick HD|7|yes|yes"
-  "AFTARK|Fire TV Stick 4K Max (2nd Gen)|8|no|yes"
+  "AFTKRT|Fire TV Stick 4K Max (2nd Gen)|8|no|yes"
 )
 
 # -------------------------------------------------------------------------------------
