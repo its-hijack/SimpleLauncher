@@ -13,6 +13,7 @@ and the shows you're part-way through.
 - **Continue Watching (Plex).** Carry on where you left off, straight from the home screen.
 - **No adverts, no tracking, no autoplay.** It's quiet, fast and lightweight.
 - **Made to look good.** Smooth animations, and background and accent colours you choose.
+- **Updates itself when you ask.** Settings › Information › Software update checks here for a newer build and installs it.
 - **Works on Fire TV and other Android devices.** It detects which it's running on and sets itself up to suit.
 
 ## Download

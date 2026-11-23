@@ -405,6 +405,11 @@ public class SettingsActivity extends Screen {
                 {"Version", BuildConfig.RELEASE_VERSION},
                 {"Build", BuildConfig.BUILD_TAG},
                 {"Made by", "Cherry Universe"}});
+        String newer = Updater.knownUpdate(this);
+        valueRow("update", "Software update",
+                newer != null ? "Build " + newer + " is ready to install" : Updater.lastChecked(this),
+                newer != null ? "Update" : "Check now",
+                () -> Screen.open(this, new Intent(this, UpdateActivity.class)));
     }
 
     // ------------------------------------------------------------------ building blocks

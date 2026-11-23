@@ -32,3 +32,10 @@ For a dedicated release key, also add `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALI
 ## Building locally
 Open the project in Android Studio and choose **Build → Build APK(s)**, or run `./gradlew assembleDebug`.
 Plain Java and Android framework APIs only, with no dependencies.
+
+## How TVs get the update
+
+Once a release is published, SimpleLauncher on any TV can install it from Settings › Information › Software update.
+It compares the release's tag with its own build (date first, then build number), so the tag must look like
+`231126-2.9` and every new release needs a higher build. Only the latest published release is offered; drafts and
+pre-releases are ignored, and the APK must be signed with the same key as the copy on the TV.
