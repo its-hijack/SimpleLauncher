@@ -3,7 +3,8 @@
 # To release a new build:
 #   1. In app/build.gradle raise versionCode by 1 and set buildDate / buildVersion
 #      (and releaseVersion for a new outward version such as V2).
-#   2. Push a tag named after the internal build, e.g. 231126-2.7
+#   2. Push a tag named after the internal build, e.g. 231126-2.7,
+#      or open Actions > Build and release > Run workflow (it creates the tag for you)
 # GitHub then builds the app, signs it and attaches SimpleLauncher-V1-231126-2.7.apk.
 #
 # One-time setup (repository Settings > Secrets and variables > Actions):
@@ -73,6 +74,8 @@ jobs:
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.build }}
+          target_commitish: ${{ github.sha }}
           name: SimpleLauncher ${{ steps.version.outputs.release }} (build ${{ steps.version.outputs.build }})
           files: ${{ steps.apk.outputs.file }}
           generate_release_notes: true
