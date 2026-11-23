@@ -29,6 +29,12 @@ $SupportedDevices = @(
     'AFTSS|Fire TV Stick HD|7|yes|yes'
 )
 
+# Devices being tested: HomeCatch only. model code | name | Fire OS version
+$TestingDevices = @(
+    'AFTSS|Fire TV Stick HD|8'
+)
+$UpdaterPkg = 'com.amazon.tv.forcedotaupdater.v2'
+
 $DebloatGroups = @(
     'ads|Adverts and tracking|Sponsored rows, autoplaying previews and the data Amazon collects about what you watch.',
     'nags|Pop-ups and help apps|Tutorials, "what''s new" screens and support apps you rarely need.',
@@ -374,7 +380,7 @@ function Prepare-AndConnect {
 #  Step 4: what is it, and what's it allowed
 # =====================================================================================
 $script:Model = ''; $script:Sdk = 0; $script:Support = 'none'
-$script:SupportedName = ''; $script:CanDebloat = $false; $script:CanHomeCatch = $false
+$script:SupportedName = ''; $script:CanDebloat = $false; $script:CanHomeCatch = $false; $script:FireMajor = 0
 
 function FireMajor([int]$sdk) {
     switch ($sdk) { 22 { return 5 } 25 { return 6 } 28 { return 7 } 30 { return 8 } default { return 0 } }
@@ -410,13 +416,23 @@ function Detect-Device {
                 $reason = "The $($f[1]) has only been tested on Fire OS $($f[2]), and this one runs Fire OS $major."
             }
         }
+        if ($script:Support -eq 'app') {
+            foreach ($e in $TestingDevices) {
+                $f = $e -split '\|'
+                if ($f[0] -eq $script:Model -and $f[2] -eq "$major") {
+                    $script:Support = 'testing'; $script:SupportedName = $f[1]
+                    $script:CanHomeCatch = $true; $script:CanDebloat = $false; $reason = ''
+                }
+            }
+        }
+        $script:FireMajor = $major
     } else {
         $script:Support = 'generic'
     }
 
     $nick = if ($name) { "  $Dot  `"$name`"" } else { '' }
     Blank
-    if ($script:Support -eq 'full') { Write-Host "  $($script:SupportedName)$nick" -ForegroundColor White }
+    if ($script:Support -eq 'full' -or $script:Support -eq 'testing') { Write-Host "  $($script:SupportedName)$nick" -ForegroundColor White }
     elseif ($fire) { Write-Host "  Amazon Fire TV$nick" -ForegroundColor White }
     else { Write-Host "  $maker $($script:Model)$nick" -ForegroundColor White }
     if ($fire) { Dim "  Model $($script:Model) $Dot $fireOs $Dot Android $android" } else { Dim "  Model $($script:Model) $Dot Android $android" }
@@ -426,6 +442,11 @@ function Detect-Device {
             Ok 'Supported device'
             if ($script:CanDebloat) { Ok 'Extras for this device: Debloat and Restore' }
             if ($script:CanHomeCatch) { Ok 'HomeCatch available (the Home button opens SimpleLauncher)' }
+        }
+        'testing' {
+            Warn "HomeCatch is being tested on the $($script:SupportedName) with Fire OS $($script:FireMajor)."
+            Note "You can install SimpleLauncher with HomeCatch. If anything doesn't work, switch"
+            Note "HomeCatch off in SimpleLauncher's Settings $Arrow Danger Zone and tell us at $RepoUrl/issues"
         }
         'app' {
             Warn $reason
@@ -702,6 +723,29 @@ function Install-Launcher {
     Blank
     $c = Choose 'Choose 1 or 2 (or q to go back):' 2
     if ($c -eq 0) { return }
+
+    # Ask everything up front, then do it all in one go.
+    $wantHomeCatch = $false; $blockUpdates = $false
+    if ($script:CanHomeCatch -and ($script:Support -eq 'full' -or $script:Support -eq 'testing')) {
+        Blank
+        Say '  HomeCatch makes the Home button on your remote open SimpleLauncher'
+        Say "  instead of Amazon's home screen. You can switch it off any time in"
+        Say "  SimpleLauncher's Settings $Arrow Danger Zone."
+        if ($script:Support -eq 'testing') { Dim "  It's still being tested on this device." }
+        $wantHomeCatch = AskYN 'Switch HomeCatch on?' 'y'
+        if ((PackageSet).ContainsKey($UpdaterPkg)) {
+            if ((PackageSet '-d').ContainsKey($UpdaterPkg)) {
+                Note "Amazon's automatic updates are already switched off on this TV."
+            } else {
+                Blank
+                Say '  Automatic Fire OS updates install by themselves and can undo your changes or'
+                Say "  stop HomeCatch working. You can still update by hand in Settings $Arrow My Fire TV."
+                $blockUpdates = AskYN 'Stop Fire OS updates installing automatically?' 'y'
+            }
+        }
+    }
+
+    Blank
     if ($c -eq 1) { if (-not (Download-Latest)) { return } } else { if (-not (Pick-LocalApk)) { return } }
 
     Blank
@@ -735,16 +779,14 @@ function Install-Launcher {
     }
 
     switch ($script:Support) {
-        'full' {
-            if ($script:CanHomeCatch) {
-                Blank
-                Say '  HomeCatch makes the Home button on your remote open SimpleLauncher'
-                Say "  instead of Amazon's home screen. You can switch it off any time in"
-                Say "  SimpleLauncher's Settings $Arrow Danger Zone."
-                if (AskYN 'Switch HomeCatch on?' 'y') {
-                    S pm grant $SlPkg android.permission.WRITE_SECURE_SETTINGS | Out-Null
-                    if (HomeCatch-On) { Ok 'HomeCatch on' } else { Bad "Fire OS didn't accept HomeCatch" }
-                }
+        { $_ -eq 'full' -or $_ -eq 'testing' } {
+            if ($wantHomeCatch) {
+                S pm grant $SlPkg android.permission.WRITE_SECURE_SETTINGS | Out-Null
+                if (HomeCatch-On) { Ok 'HomeCatch on' } else { Bad "Fire OS didn't accept HomeCatch" }
+            }
+            if ($blockUpdates) {
+                if ((S pm disable-user --user 0 $UpdaterPkg) -match 'disabled') { Ok 'Automatic Fire OS updates off' }
+                else { Bad "Fire OS wouldn't switch off automatic updates" }
             }
         }
         'app' {
@@ -769,6 +811,11 @@ function Uninstall-Launcher {
     if (-not (AskYN 'Uninstall SimpleLauncher and its settings from this device?' 'n')) { return }
     HomeCatch-Off
     if ((A uninstall $SlPkg) -match 'Success') { Ok 'SimpleLauncher removed' } else { Bad "Couldn't remove it" }
+    if ((PackageSet '-d').ContainsKey($UpdaterPkg)) {
+        if (AskYN "Also turn Amazon's automatic updates back on?" 'y') {
+            if ((S pm enable $UpdaterPkg) -match 'enabled') { Ok 'Automatic Fire OS updates on' } else { Bad "Couldn't turn them back on" }
+        }
+    }
 }
 
 # =====================================================================================

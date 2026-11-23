@@ -34,6 +34,22 @@ SUPPORTED_DEVICES=(
 )
 
 # -------------------------------------------------------------------------------------
+#  Devices being tested
+#
+#  HomeCatch is offered on these while it's tested, but nothing else: no extras, and
+#  they aren't called supported. Move a line up to SUPPORTED_DEVICES once it's confirmed.
+#
+#  model code | name | Fire OS version
+# -------------------------------------------------------------------------------------
+TESTING_DEVICES=(
+  "AFTSS|Fire TV Stick HD|8"
+)
+
+# Amazon's automatic Fire OS updater. Switching it off stops updates installing by themselves
+# (they can undo changes and break HomeCatch). Offered when installing with HomeCatch.
+UPDATER_PKG="com.amazon.tv.forcedotaupdater.v2"
+
+# -------------------------------------------------------------------------------------
 #  Debloat list
 #
 #  group | package | what it is | recommended (y = switch off) | how (disable or uninstall)
@@ -425,7 +441,7 @@ device_label() {
 #  Step 4: what is it, and what's it allowed
 # =====================================================================================
 MODEL=""; MAKER=""; DEVICE_NAME=""; ANDROID=""; SDK=0; FIRE_OS=""; FIRE_MAJOR=0
-SUPPORT="none"        # full, app, generic
+SUPPORT="none"        # full, testing, app, generic
 SUPPORTED_NAME=""; CAN_DEBLOAT=no; CAN_HOMECATCH=no; SUPPORT_REASON=""
 
 fire_major_from_sdk() {
@@ -464,12 +480,20 @@ detect_device() {
         fi
       fi
     done
+    if [ "$SUPPORT" = "app" ]; then
+      for entry in "${TESTING_DEVICES[@]}"; do
+        IFS='|' read -r code name osv <<< "$entry"
+        if [ "$code" = "$MODEL" ] && [ "$osv" = "$FIRE_MAJOR" ]; then
+          SUPPORT="testing"; SUPPORTED_NAME="$name"; CAN_HOMECATCH=yes; CAN_DEBLOAT=no; SUPPORT_REASON=""
+        fi
+      done
+    fi
   else
     SUPPORT="generic"
   fi
 
   blank
-  if [ "$SUPPORT" = "full" ]; then
+  if [ "$SUPPORT" = "full" ] || [ "$SUPPORT" = "testing" ]; then
     say "  ${B}$SUPPORTED_NAME${R}${DEVICE_NAME:+  ·  \"$DEVICE_NAME\"}"
   elif [ "$fire" = "yes" ]; then
     say "  ${B}Amazon Fire TV${R}${DEVICE_NAME:+  ·  \"$DEVICE_NAME\"}"
@@ -487,6 +511,11 @@ detect_device() {
       ok "Supported device"
       [ "$CAN_DEBLOAT" = "yes" ] && ok "Extras for this device: Debloat and Restore"
       [ "$CAN_HOMECATCH" = "yes" ] && ok "HomeCatch available ${D}(the Home button opens SimpleLauncher)${R}"
+      ;;
+    testing)
+      warn "HomeCatch is being tested on the $SUPPORTED_NAME with Fire OS $FIRE_MAJOR."
+      note "You can install SimpleLauncher with HomeCatch. If anything doesn't work, switch"
+      note "HomeCatch off in SimpleLauncher's Settings › Danger Zone and tell us at $REPO_URL/issues"
       ;;
     app)
       warn "$SUPPORT_REASON"
@@ -804,7 +833,32 @@ install_launcher() {
   blank
   choose "Choose 1 or 2 (or q to go back):" 2
   [ "$CHOICE" = "q" ] && return
-  if [ "$CHOICE" = "1" ]; then download_latest || return; else pick_local_apk || return; fi
+  local source="$CHOICE"
+
+  # Ask everything up front, then do it all in one go.
+  local want_homecatch=no block_updates=no
+  if [ "$CAN_HOMECATCH" = "yes" ] && { [ "$SUPPORT" = "full" ] || [ "$SUPPORT" = "testing" ]; }; then
+    blank
+    say "  ${B}HomeCatch${R} makes the Home button on your remote open SimpleLauncher"
+    say "  instead of Amazon's home screen. You can switch it off any time in"
+    say "  SimpleLauncher's Settings › Danger Zone."
+    [ "$SUPPORT" = "testing" ] && say "  ${D}It's still being tested on this device.${R}"
+    ask_yn "Switch HomeCatch on?" y && want_homecatch=yes
+
+    if installed "$UPDATER_PKG"; then
+      if disabled_list | grep -qx "$UPDATER_PKG"; then
+        note "Amazon's automatic updates are already switched off on this TV."
+      else
+        blank
+        say "  ${B}Automatic Fire OS updates${R} install by themselves and can undo your changes or"
+        say "  stop HomeCatch working. You can still update by hand in Settings › My Fire TV."
+        ask_yn "Stop Fire OS updates installing automatically?" y && block_updates=yes
+      fi
+    fi
+  fi
+
+  blank
+  if [ "$source" = "1" ]; then download_latest || return; else pick_local_apk || return; fi
 
   blank
   note "Installing on your TV…"
@@ -839,15 +893,16 @@ install_launcher() {
   fi
 
   case "$SUPPORT" in
-    full)
-      if [ "$CAN_HOMECATCH" = "yes" ]; then
-        blank
-        say "  ${B}HomeCatch${R} makes the Home button on your remote open SimpleLauncher"
-        say "  instead of Amazon's home screen. You can switch it off any time in"
-        say "  SimpleLauncher's Settings › Danger Zone."
-        if ask_yn "Switch HomeCatch on?" y; then
-          S pm grant "$SL_PKG" android.permission.WRITE_SECURE_SETTINGS >/dev/null
-          if homecatch_on; then ok "HomeCatch on"; else bad "Fire OS didn't accept HomeCatch"; fi
+    full|testing)
+      if [ "$want_homecatch" = "yes" ]; then
+        S pm grant "$SL_PKG" android.permission.WRITE_SECURE_SETTINGS >/dev/null
+        if homecatch_on; then ok "HomeCatch on"; else bad "Fire OS didn't accept HomeCatch"; fi
+      fi
+      if [ "$block_updates" = "yes" ]; then
+        if S pm disable-user --user 0 "$UPDATER_PKG" | grep -q disabled; then
+          ok "Automatic Fire OS updates off"
+        else
+          bad "Fire OS wouldn't switch off automatic updates"
         fi
       fi
       ;;
@@ -874,6 +929,11 @@ uninstall_launcher() {
   ask_yn "Uninstall SimpleLauncher and its settings from this device?" n || return
   homecatch_off 2>/dev/null
   if A uninstall "$SL_PKG" 2>&1 | grep -q Success; then ok "SimpleLauncher removed"; else bad "Couldn't remove it"; fi
+  if disabled_list | grep -qx "$UPDATER_PKG"; then
+    if ask_yn "Also turn Amazon's automatic updates back on?" y; then
+      S pm enable "$UPDATER_PKG" | grep -q enabled && ok "Automatic Fire OS updates on" || bad "Couldn't turn them back on"
+    fi
+  fi
 }
 
 # =====================================================================================
