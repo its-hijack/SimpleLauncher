@@ -316,7 +316,7 @@ public class UpdateActivity extends Screen {
                 label("COULDN'T UPDATE", RED);
                 heading(errorTitle, errorMessage);
                 infoBox("If this keeps happening, please leave a bug report at " + Updater.ISSUES_URL
-                        + ", then reinstall SimpleLauncher from your computer with firestick.sh (option 3).");
+                        + ", then reinstall SimpleLauncher from your computer.");
                 spacer();
                 buttonRow();
                 button("Try again", true, release != null && "The download didn't finish".equals(errorTitle)
