@@ -29,9 +29,10 @@ $SupportedDevices = @(
     'AFTSS|Fire TV Stick HD|7|yes|yes'
 )
 
-# Devices being tested: HomeCatch only. model code | name | Fire OS version
+# Devices being tested: HomeCatch only. model code | name | Fire OS version (* = any)
 $TestingDevices = @(
-    'AFTSS|Fire TV Stick HD|8'
+    'AFTSS|Fire TV Stick HD|8',
+    'AFTARK|Fire TV (model AFTARK)|*'
 )
 $UpdaterPkg = 'com.amazon.tv.forcedotaupdater.v2'
 
@@ -419,7 +420,7 @@ function Detect-Device {
         if ($script:Support -eq 'app') {
             foreach ($e in $TestingDevices) {
                 $f = $e -split '\|'
-                if ($f[0] -eq $script:Model -and $f[2] -eq "$major") {
+                if ($f[0] -eq $script:Model -and ($f[2] -eq "$major" -or $f[2] -eq '*')) {
                     $script:Support = 'testing'; $script:SupportedName = $f[1]
                     $script:CanHomeCatch = $true; $script:CanDebloat = $false; $reason = ''
                 }

@@ -40,7 +40,7 @@ lists = '\n'.join([
     '# Supported devices: model code | name | Fire OS version tested | extras | HomeCatch',
     ps_array('SupportedDevices', bash_array('SUPPORTED_DEVICES')),
     '',
-    '# Devices being tested: HomeCatch only. model code | name | Fire OS version',
+    '# Devices being tested: HomeCatch only. model code | name | Fire OS version (* = any)',
     ps_array('TestingDevices', bash_array('TESTING_DEVICES')),
     '$UpdaterPkg = ' + ps(value('UPDATER_PKG')),
     '',

@@ -347,7 +347,7 @@ function Detect-Device {
         if ($script:Support -eq 'app') {
             foreach ($e in $TestingDevices) {
                 $f = $e -split '\|'
-                if ($f[0] -eq $script:Model -and $f[2] -eq "$major") {
+                if ($f[0] -eq $script:Model -and ($f[2] -eq "$major" -or $f[2] -eq '*')) {
                     $script:Support = 'testing'; $script:SupportedName = $f[1]
                     $script:CanHomeCatch = $true; $script:CanDebloat = $false; $reason = ''
                 }

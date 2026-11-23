@@ -39,10 +39,11 @@ SUPPORTED_DEVICES=(
 #  HomeCatch is offered on these while it's tested, but nothing else: no extras, and
 #  they aren't called supported. Move a line up to SUPPORTED_DEVICES once it's confirmed.
 #
-#  model code | name | Fire OS version
+#  model code | name | Fire OS version (* = any version)
 # -------------------------------------------------------------------------------------
 TESTING_DEVICES=(
   "AFTSS|Fire TV Stick HD|8"
+  "AFTARK|Fire TV (model AFTARK)|*"
 )
 
 # Amazon's automatic Fire OS updater. Switching it off stops updates installing by themselves
@@ -483,7 +484,7 @@ detect_device() {
     if [ "$SUPPORT" = "app" ]; then
       for entry in "${TESTING_DEVICES[@]}"; do
         IFS='|' read -r code name osv <<< "$entry"
-        if [ "$code" = "$MODEL" ] && [ "$osv" = "$FIRE_MAJOR" ]; then
+        if [ "$code" = "$MODEL" ] && { [ "$osv" = "$FIRE_MAJOR" ] || [ "$osv" = "*" ]; }; then
           SUPPORT="testing"; SUPPORTED_NAME="$name"; CAN_HOMECATCH=yes; CAN_DEBLOAT=no; SUPPORT_REASON=""
         fi
       done

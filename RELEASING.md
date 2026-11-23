@@ -47,7 +47,7 @@ Both lists are at the top of `SimpleScript.sh`:
 - `SUPPORTED_DEVICES`: one line per tested device (`model code|name|Fire OS version|debloat|HomeCatch`).
   Only listed devices get HomeCatch and the device extras (Debloat and Restore, shown only in SimpleScript on
   that device). Add it to the README table too, but keep the extras out of the README.
-- `TESTING_DEVICES`: devices being tested (`model code|name|Fire OS version`). They get HomeCatch only, and
+- `TESTING_DEVICES`: devices being tested (`model code|name|Fire OS version`, or `*` for any version). They get HomeCatch only, and
   aren't called supported. Once one is confirmed, move it up to `SUPPORTED_DEVICES` and the README table.
 - `DEBLOAT_LIST`: one line per app (`group|package|description|recommended y/n|disable or uninstall`).
   People who debloated before are asked about new lines next time, marked NEW.
