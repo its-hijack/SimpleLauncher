@@ -16,6 +16,13 @@ and the shows you're part-way through.
 - **Updates itself when you ask.** Settings › Information › Software update checks here for a newer build and installs it.
 - **Works on Fire TV and other Android devices.** It detects which it's running on and sets itself up to suit.
 
+## What it looks like
+
+<p align="center">
+  <img src="docs/home-screen.png" alt="The SimpleLauncher home screen: logo, clock and date, your apps across the middle, and Continue Watching from Plex underneath" width="900">
+</p>
+<p align="center"><sub>The home screen on a Fire TV. On your TV, each app shows its own banner.</sub></p>
+
 ## Supported devices
 
 Every device can use SimpleLauncher. Extras that change how the device behaves are only switched on

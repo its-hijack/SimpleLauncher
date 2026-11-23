@@ -52,3 +52,8 @@ Both lists are at the top of `SimpleScript.sh`:
 The Windows version (`windows/`, written in Go) reads both lists from `SimpleScript.sh` when it's built,
 so there's only one place to edit. Each release builds `SimpleScript.exe` and attaches it, along with
 `SimpleScript.sh`. To build it yourself: `bash windows/build.sh` (needs Go).
+
+## The home screen picture in the README
+
+`docs/home-screen.png` is rendered from `docs/home-screen.html`. When the home screen's design changes,
+update that HTML to match and run `bash docs/render.sh` (needs Google Chrome), then commit both.
