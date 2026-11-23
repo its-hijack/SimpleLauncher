@@ -43,7 +43,7 @@ SUPPORTED_DEVICES=(
 # -------------------------------------------------------------------------------------
 TESTING_DEVICES=(
   "AFTSS|Fire TV Stick HD|8"
-  "AFTARK|Fire TV (model AFTARK)|*"
+  "AFTARK|Fire TV Stick 4K Max (2nd Gen)|*"
 )
 
 # Amazon's automatic Fire OS updater. Switching it off stops updates installing by themselves
@@ -459,7 +459,7 @@ detect_device() {
   SDK=$(S getprop ro.build.version.sdk); SDK=${SDK:-0}
   DEVICE_NAME=$(S settings get global device_name); [ "$DEVICE_NAME" = "null" ] && DEVICE_NAME=""
 
-  local fire=no
+  fire=no   # kept for the menu (Extras are for Fire TVs)
   if [ "$MAKER" = "Amazon" ] && printf '%s' "$MODEL" | grep -q '^AFT'; then fire=yes; fi
   if S pm list features | grep -q 'amazon.hardware.fire_tv'; then fire=yes; fi
 
@@ -908,8 +908,10 @@ install_launcher() {
       fi
       ;;
     app)
-      note "HomeCatch stays off on this Fire TV because it hasn't been tested yet."
-      note "Open SimpleLauncher from ${B}Your Apps${R} on the Fire TV home screen."
+      if [ "$FORCING" != "yes" ]; then
+        note "HomeCatch stays off on this Fire TV because it hasn't been tested yet."
+        note "Open SimpleLauncher from ${B}Your Apps${R} on the Fire TV home screen."
+      fi
       ;;
     generic)
       blank
@@ -923,6 +925,32 @@ install_launcher() {
   S am start -n "$SL_PKG/.MainActivity" >/dev/null 2>&1
   blank
   ok "All done. SimpleLauncher is open on your TV."
+}
+
+# Extras: HomeCatch on a Fire TV that isn't on either list, at your own risk.
+force_homecatch() {
+  heading "Force Install HomeCatch"
+  if [ "$CAN_HOMECATCH" != "yes" ]; then
+    warn "HomeCatch hasn't been tested on this Fire TV, so it might not work properly."
+    say "  If anything goes wrong, switch it off in SimpleLauncher's Settings › Danger Zone,"
+    say "  or choose Remove SimpleLauncher here. Tell us how it went: $REPO_URL/issues"
+    blank
+    ask_yn "Switch HomeCatch on anyway?" n || { say "  OK, nothing was changed."; return; }
+  fi
+  if ! sl_installed; then
+    note "SimpleLauncher isn't installed yet, so let's install it first."
+    FORCING=yes
+    install_launcher
+    FORCING=no
+    sl_installed || { bad "SimpleLauncher isn't installed, so HomeCatch can't be switched on."; return; }
+  fi
+  blank
+  S pm grant "$SL_PKG" android.permission.WRITE_SECURE_SETTINGS >/dev/null
+  if homecatch_on; then
+    ok "HomeCatch on. Press Home on the remote to try it."
+  else
+    bad "Fire OS didn't accept HomeCatch on this device."
+  fi
 }
 
 uninstall_launcher() {
@@ -953,11 +981,14 @@ menu() {
       n=$((n+1)); actions+=("uninstall"); say "  $n) Remove SimpleLauncher"
     fi
     n=$((n+1)); actions+=("reboot"); say "  $n) Restart the TV"
-    if [ "$SUPPORT" = "full" ] && [ "$CAN_DEBLOAT" = "yes" ]; then
+    if [ "$fire" = "yes" ]; then
       blank
-      say "  ${B}Extras for your $SUPPORTED_NAME${R}"
-      n=$((n+1)); actions+=("debloat"); say "  $n) Debloat ${D}(choose what to switch off)${R}"
-      n=$((n+1)); actions+=("restore"); say "  $n) Restore to stock"
+      say "  ${B}Extras${R}"
+      if [ "$SUPPORT" = "full" ] && [ "$CAN_DEBLOAT" = "yes" ]; then
+        n=$((n+1)); actions+=("debloat"); say "  $n) Debloat ${D}(choose what to switch off)${R}"
+        n=$((n+1)); actions+=("restore"); say "  $n) Restore to stock"
+      fi
+      n=$((n+1)); actions+=("force"); say "  $n) Force Install HomeCatch ${D}(on any Fire TV, even untested ones)${R}"
     fi
     say "  q) Quit"
     blank
@@ -968,6 +999,7 @@ menu() {
       debloat) debloat ;;
       restore) restore ;;
       uninstall) uninstall_launcher ;;
+      force) force_homecatch ;;
       reboot) A reboot >/dev/null 2>&1; ok "Restarting your TV."; break ;;
     esac
   done

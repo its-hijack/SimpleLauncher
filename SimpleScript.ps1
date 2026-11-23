@@ -32,7 +32,7 @@ $SupportedDevices = @(
 # Devices being tested: HomeCatch only. model code | name | Fire OS version (* = any)
 $TestingDevices = @(
     'AFTSS|Fire TV Stick HD|8',
-    'AFTARK|Fire TV (model AFTARK)|*'
+    'AFTARK|Fire TV Stick 4K Max (2nd Gen)|*'
 )
 $UpdaterPkg = 'com.amazon.tv.forcedotaupdater.v2'
 
@@ -381,7 +381,7 @@ function Prepare-AndConnect {
 #  Step 4: what is it, and what's it allowed
 # =====================================================================================
 $script:Model = ''; $script:Sdk = 0; $script:Support = 'none'
-$script:SupportedName = ''; $script:CanDebloat = $false; $script:CanHomeCatch = $false; $script:FireMajor = 0
+$script:SupportedName = ''; $script:CanDebloat = $false; $script:CanHomeCatch = $false; $script:FireMajor = 0; $script:IsFire = $false; $script:Forcing = $false
 
 function FireMajor([int]$sdk) {
     switch ($sdk) { 22 { return 5 } 25 { return 6 } 28 { return 7 } 30 { return 8 } default { return 0 } }
@@ -398,6 +398,7 @@ function Detect-Device {
     if ($name -eq 'null') { $name = '' }
 
     $fire = ($maker -eq 'Amazon' -and $script:Model -like 'AFT*') -or ((S pm list features) -match 'amazon.hardware.fire_tv')
+    $script:IsFire = $fire   # kept for the menu (Extras are for Fire TVs)
     $reason = ''
     $fireOs = ''
     if ($fire) {
@@ -791,8 +792,10 @@ function Install-Launcher {
             }
         }
         'app' {
-            Note "HomeCatch stays off on this Fire TV because it hasn't been tested yet."
-            Note 'Open SimpleLauncher from Your Apps on the Fire TV home screen.'
+            if (-not $script:Forcing) {
+                Note "HomeCatch stays off on this Fire TV because it hasn't been tested yet."
+                Note 'Open SimpleLauncher from Your Apps on the Fire TV home screen.'
+            }
         }
         'generic' {
             Blank
@@ -805,6 +808,29 @@ function Install-Launcher {
     S am start -n "$SlPkg/.MainActivity" | Out-Null
     Blank
     Ok 'All done. SimpleLauncher is open on your TV.'
+}
+
+# Extras: HomeCatch on a Fire TV that isn't on either list, at your own risk.
+function Force-HomeCatch {
+    Heading 'Force Install HomeCatch'
+    if (-not $script:CanHomeCatch) {
+        Warn "HomeCatch hasn't been tested on this Fire TV, so it might not work properly."
+        Say "  If anything goes wrong, switch it off in SimpleLauncher's Settings $Arrow Danger Zone,"
+        Say "  or choose Remove SimpleLauncher here. Tell us how it went: $RepoUrl/issues"
+        Blank
+        if (-not (AskYN 'Switch HomeCatch on anyway?' 'n')) { Say '  OK, nothing was changed.'; return }
+    }
+    if (-not (SlInstalled)) {
+        Note "SimpleLauncher isn't installed yet, so let's install it first."
+        $script:Forcing = $true
+        Install-Launcher
+        $script:Forcing = $false
+        if (-not (SlInstalled)) { Bad "SimpleLauncher isn't installed, so HomeCatch can't be switched on."; return }
+    }
+    Blank
+    S pm grant $SlPkg android.permission.WRITE_SECURE_SETTINGS | Out-Null
+    if (HomeCatch-On) { Ok 'HomeCatch on. Press Home on the remote to try it.' }
+    else { Bad "Fire OS didn't accept HomeCatch on this device." }
 }
 
 function Uninstall-Launcher {
@@ -832,11 +858,14 @@ function Show-Menu {
         else { $actions += 'install'; Say "  $($actions.Count)) Install SimpleLauncher" }
         if ($installed -and -not $extras) { $actions += 'uninstall'; Say "  $($actions.Count)) Remove SimpleLauncher" }
         $actions += 'reboot'; Say "  $($actions.Count)) Restart the TV"
-        if ($extras) {
+        if ($script:IsFire) {
             Blank
-            Write-Host "  Extras for your $($script:SupportedName)" -ForegroundColor White
-            $actions += 'debloat'; Say "  $($actions.Count)) Debloat (choose what to switch off)"
-            $actions += 'restore'; Say "  $($actions.Count)) Restore to stock"
+            Write-Host '  Extras' -ForegroundColor White
+            if ($extras) {
+                $actions += 'debloat'; Say "  $($actions.Count)) Debloat (choose what to switch off)"
+                $actions += 'restore'; Say "  $($actions.Count)) Restore to stock"
+            }
+            $actions += 'force'; Say "  $($actions.Count)) Force Install HomeCatch (on any Fire TV, even untested ones)"
         }
         Say '  q) Quit'
         Blank
@@ -847,6 +876,7 @@ function Show-Menu {
             'debloat' { Debloat }
             'restore' { Restore }
             'uninstall' { Uninstall-Launcher }
+            'force' { Force-HomeCatch }
             'reboot' { A reboot | Out-Null; Ok 'Restarting your TV.'; Blank; Say "  Thanks for using SimpleScript. Problems or ideas: $RepoUrl/issues"; Finish 0 }
         }
     }
