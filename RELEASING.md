@@ -39,3 +39,12 @@ Once a release is published, SimpleLauncher on any TV can install it from Settin
 It compares the release's tag with its own build (date first, then build number), so the tag must look like
 `231126-2.9` and every new release needs a higher build. Only the latest published release is offered; drafts and
 pre-releases are ignored, and the APK must be signed with the same key as the copy on the TV.
+
+## Adding a supported device or a debloat item
+
+Both lists are at the top of `SimpleScript.sh`:
+
+- `SUPPORTED_DEVICES`: one line per tested device (`model code|name|Fire OS version|debloat|HomeCatch`).
+  Only listed devices are offered Debloat, Restore and HomeCatch. Also add it to the table in `README.md`.
+- `DEBLOAT_LIST`: one line per app (`group|package|description|recommended y/n|disable or uninstall`).
+  People who debloated before are asked about new lines next time, marked NEW.
