@@ -471,7 +471,7 @@ public class SetupActivity extends Screen {
         String homeLine;
         if (Mode.fireTv(this)) {
             homeLine = HomeButtonService.isEnabled(this) && Prefs.hook(this) ? "Opens SimpleLauncher"
-                    : "Not set up: run firestick.sh on a computer, option 3";
+                    : "Not set up yet: set it up from your computer over ADB";
         } else {
             homeLine = Mode.isDefaultHome(this) ? "SimpleLauncher is your home app" : "Choose it in Settings → Danger Zone";
         }

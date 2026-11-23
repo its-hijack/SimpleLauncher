@@ -275,8 +275,6 @@ public class UpdateActivity extends Screen {
                 step("1", "Select Open settings below");
                 step("2", "Find SimpleLauncher in the list");
                 step("3", "Switch it On, then press Back");
-                gap(10);
-                card.addView(text("This is done for you when you install with firestick.sh option 3.", 12, LABEL, false));
                 spacer();
                 buttonRow();
                 button("Open settings", true, () -> {

@@ -261,7 +261,7 @@ public class SettingsActivity extends Screen {
         section("HOMECATCH", true);
         toggleRow("hook", "Open SimpleLauncher when Home is pressed",
                 serviceOn ? "Replaces Amazon's home screen with this one"
-                        : "Not set up yet: run firestick.sh on your Mac and choose 3",
+                        : "Not set up yet: set it up from your computer over ADB",
                 Prefs.hook(this) && serviceOn, this::setHook);
         final boolean untilHome = Prefs.passUntilHome(this);
         valueRow("pass", "Amazon Home button",
@@ -595,7 +595,7 @@ public class SettingsActivity extends Screen {
     private void setHook(boolean on) {
         Prefs.setBool(this, Prefs.HOOK, on);
         if (on && !HomeButtonService.isEnabled(this) && !HomeButtonService.enable(this)) {
-            Apps.toast(this, "Run firestick.sh on your Mac and choose 3 to allow this");
+            Apps.toast(this, "Set up HomeCatch from your computer over ADB first");
         }
     }
 
