@@ -12,7 +12,7 @@ import java.util.List;
 /**
  * Fire TV mode or generic mode.
  *
- * Fire TV mode: the Home-button catcher, the "Amazon Home" button, Fire OS details.
+ * Fire TV mode: HomeCatch (the Home-button catcher), the "Amazon Home" button, Fire OS details.
  * Generic mode (any other Android device): no catcher, "Return home" opens the
  * device's original home screen, and Settings offers Android's home-app picker.
  *

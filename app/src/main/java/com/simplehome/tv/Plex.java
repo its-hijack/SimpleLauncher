@@ -69,6 +69,16 @@ final class Plex {
         return Mode.isInstalled(c, PLEX_APP);
     }
 
+    /** The installed Plex app's version, e.g. "10.24.0.1234", for Settings → Plex. */
+    static String appVersion(Context c) {
+        try {
+            String v = c.getPackageManager().getPackageInfo(PLEX_APP, 0).versionName;
+            return v != null ? v : "Installed";
+        } catch (Exception e) {
+            return "Not installed";
+        }
+    }
+
     static void clearCache() {
         cache = null;
         cacheTime = 0;

@@ -12,7 +12,7 @@ plugins {
 // ---------------------------------------------------------------------------------------
 def releaseVersion = 'V1'
 def buildDate = '231126'
-def buildVersion = '2.7'
+def buildVersion = '2.8'
 
 android {
     namespace 'com.simplehome.tv'
@@ -22,7 +22,7 @@ android {
         applicationId 'com.simplehome.tv'
         minSdk 25          // Fire OS 6+
         targetSdk 28       // Fire OS 7 (Android 9)
-        versionCode 11
+        versionCode 12
         versionName "${releaseVersion} (${buildDate}-${buildVersion})"
 
         // Shown in Settings → Information

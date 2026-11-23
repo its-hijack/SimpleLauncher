@@ -198,7 +198,7 @@ public class SetupActivity extends Screen {
         card.setPadding(Ui.dp(this, 18), Ui.dp(this, 12), Ui.dp(this, 18), Ui.dp(this, 12));
         card.addView(text(Mode.detected(this) + " detected", 15, Color.WHITE));
         card.addView(text(fire
-                ? "SimpleLauncher will run in Fire TV mode, with the Home-button catcher and the Amazon Home button."
+                ? "SimpleLauncher will run in Fire TV mode, with HomeCatch and the Amazon Home button."
                 : "SimpleLauncher will run in generic mode, with a Return home button for your device's own home screen.",
                 13, Ui.TEXT_DIM));
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -458,7 +458,7 @@ public class SetupActivity extends Screen {
                 .setInterpolator(new android.view.animation.OvershootInterpolator(2f)).start();
         TextView big = text("You're all set", 32, Color.WHITE);
         left.addView(big);
-        TextView sub = text("Everything can be changed later in Settings. To run setup again, go to Settings → Shortcuts → Run setup again.", 15, Ui.TEXT_DIM);
+        TextView sub = text("Everything can be changed later in Settings. To run setup again, go to Settings → Danger Zone → Run setup again.", 15, Ui.TEXT_DIM);
         sub.setPadding(0, Ui.dp(this, 8), Ui.dp(this, 24), 0);
         left.addView(sub);
         row.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -473,7 +473,7 @@ public class SetupActivity extends Screen {
             homeLine = HomeButtonService.isEnabled(this) && Prefs.hook(this) ? "Opens SimpleLauncher"
                     : "Not set up: run firestick.sh on a computer, option 3";
         } else {
-            homeLine = Mode.isDefaultHome(this) ? "SimpleLauncher is your home app" : "Choose it in Settings → Home app";
+            homeLine = Mode.isDefaultHome(this) ? "SimpleLauncher is your home app" : "Choose it in Settings → Danger Zone";
         }
 
         LinearLayout summary = new LinearLayout(this);
@@ -487,7 +487,7 @@ public class SetupActivity extends Screen {
                         + colourName(Ui.ACCENT_NAMES, Ui.ACCENT_COLORS, Prefs.accent(this)) + " · "
                         + (Prefs.clock24(this) ? "24-hour clock" : "12-hour clock")},
                 {"Plex", plexLine},
-                {Mode.fireTv(this) ? "Home button" : "Home app", homeLine}};
+                {Mode.fireTv(this) ? "HomeCatch" : "Home app", homeLine}};
         for (int i = 0; i < lines.length; i++) {
             LinearLayout line = new LinearLayout(this);
             line.setOrientation(LinearLayout.HORIZONTAL);

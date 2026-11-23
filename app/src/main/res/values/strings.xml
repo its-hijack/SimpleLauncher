@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SimpleLauncher</string>
-    <string name="service_name">SimpleLauncher – Home button</string>
+    <string name="service_name">SimpleLauncher – HomeCatch</string>
     <string name="service_description">Opens SimpleLauncher when you press the Home button on your remote, instead of Amazon\'s home screen. It only looks at the Home button and which app is on screen.</string>
 </resources>

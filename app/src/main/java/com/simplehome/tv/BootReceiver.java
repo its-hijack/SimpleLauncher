@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-/** After the stick restarts, open SimpleLauncher (if the Home button catcher is on). */
+/** After the stick restarts, open SimpleLauncher (if HomeCatch is on). */
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {

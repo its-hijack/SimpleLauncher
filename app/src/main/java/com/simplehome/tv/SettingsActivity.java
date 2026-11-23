@@ -68,14 +68,13 @@ public class SettingsActivity extends Screen {
 
     // ------------------------------------------------------------------ categories
 
-    /** Which categories to show: the Plex one only while Plex is installed; Home button/app depends on the mode. */
+    /** Which categories to show: the Plex one only while Plex is installed. */
     private List<String> wantedCategories() {
         List<String> list = new ArrayList<>();
         list.add("Home screen");
         list.add("Appearance");
-        list.add(Mode.fireTv(this) ? "Home button" : "Home app");
         if (Plex.installed(this)) list.add("Plex");
-        list.add("Shortcuts");
+        list.add("Danger Zone");
         list.add("Information");
         return list;
     }
@@ -189,10 +188,8 @@ public class SettingsActivity extends Screen {
             switch (current) {
                 case "Home screen": homeScreen(); break;
                 case "Appearance": appearance(); break;
-                case "Home button": homeButton(); break;
-                case "Home app": homeApp(); break;
                 case "Plex": plex(); break;
-                case "Shortcuts": shortcuts(); break;
+                case "Danger Zone": dangerZone(); break;
                 default: information(); break;
             }
             // Switching category: the options fade and slide into place.
@@ -258,9 +255,10 @@ public class SettingsActivity extends Screen {
                 on -> Prefs.setBool(this, Prefs.SHOW_YEAR, on));
     }
 
-    private void homeButton() {
+    /** HomeCatch: the Fire TV Home-button catcher. */
+    private void homeCatch() {
         boolean serviceOn = HomeButtonService.isEnabled(this);
-        section("HOME BUTTON", true);
+        section("HOMECATCH", true);
         toggleRow("hook", "Open SimpleLauncher when Home is pressed",
                 serviceOn ? "Replaces Amazon's home screen with this one"
                         : "Not set up yet: run firestick.sh on your Mac and choose 3",
@@ -273,9 +271,8 @@ public class SettingsActivity extends Screen {
                     Prefs.setBool(this, Prefs.PASS_UNTIL_HOME, !untilHome);
                     render();
                 });
-        section("STATUS", false);
         String status = !serviceOn ? "Not set up" : Prefs.hook(this) ? "Running" : "Switched off";
-        valueRow("status", "Home-button catcher", null, status, null);
+        valueRow("status", "Status", null, status, null);
     }
 
     private void homeApp() {
@@ -284,21 +281,28 @@ public class SettingsActivity extends Screen {
         valueRow("default_home", "Use SimpleLauncher as your home screen",
                 isHome ? "SimpleLauncher opens when you press Home" : "Choose SimpleLauncher in Android's home app settings",
                 isHome ? "On" : "Set it up", () -> Mode.openHomeAppPicker(this));
-        section("RETURN HOME BUTTON", false);
         valueRow("return_home", "Return home", "Opens your device's original home screen", "Try it",
                 () -> Mode.openOriginalHome(this));
     }
 
     private void plex() {
         boolean signedIn = Prefs.plexToken(this) != null;
+        String user = Prefs.plexUser(this);
         section("ACCOUNT", true);
         if (signedIn) {
-            String user = Prefs.plexUser(this);
             valueRow("plex", "Plex account", "Signed in" + (user != null ? " as " + user : ""), "Sign out", this::plexSignOut);
         } else {
             valueRow("plex", "Plex account", "Needed for the Continue Watching (Plex) row", "Sign in", this::plexSignIn);
-            return;
         }
+        if (signedIn) plexContinueWatching();
+        String servers = Plex.serverNames(this);
+        infoGroup("PLEX STATUS", false, new String[][]{
+                {"Plex app", Plex.appVersion(this)},
+                {"Account", !signedIn ? "Not signed in" : "Signed in" + (user != null ? " as " + user : "")},
+                {"Server", !signedIn ? "Sign in first" : servers != null ? servers : "Not connected yet"}});
+    }
+
+    private void plexContinueWatching() {
         section("CONTINUE WATCHING", false);
         final boolean details = Prefs.plexOpenDetails(this);
         valueRow("plex_open", "When you select a show", "Switch this if Plex opens the wrong place",
@@ -307,12 +311,12 @@ public class SettingsActivity extends Screen {
                     render();
                 });
         valueRow("plex_refresh", "Refresh now", "Fetch the latest from your Plex server", "Refresh", this::plexRefresh);
-        String servers = Plex.serverNames(this);
-        valueRow("plex_server", "Server", null, servers != null ? servers : "Not connected yet", null);
     }
 
-    private void shortcuts() {
-        section("SHORTCUTS", true);
+    /** Danger Zone: HomeCatch (Fire TV) or Home app (generic), shortcuts and reset. */
+    private void dangerZone() {
+        if (Mode.fireTv(this)) homeCatch(); else homeApp();
+        section("SHORTCUTS", false);
         if (Mode.fireTv(this)) {
             valueRow("fire_settings", "Fire TV settings", "Opens Amazon's settings", "Open", () -> {
                 HomeButtonService.allowAmazonHome();
@@ -385,10 +389,6 @@ public class SettingsActivity extends Screen {
         }
         valueRow("mode_detected", "Detected as", null, Mode.detected(this), null);
 
-        String plexLine = !Plex.installed(this) ? "Not installed" : Prefs.plexToken(this) == null ? "Not signed in"
-                : "Signed in" + (Plex.serverNames(this) != null ? " · " + Plex.serverNames(this) : "");
-        boolean serviceOn = HomeButtonService.isEnabled(this);
-
         infoGroup("DEVICE", false, new String[][]{
                 {"Device name", DeviceInfo.deviceName(this)},
                 {"Model", DeviceInfo.model()},
@@ -404,11 +404,7 @@ public class SettingsActivity extends Screen {
         infoGroup("SIMPLELAUNCHER", false, new String[][]{
                 {"Version", BuildConfig.RELEASE_VERSION},
                 {"Build", BuildConfig.BUILD_TAG},
-                {"Made by", "Cherry Universe"},
-                Mode.fireTv(this)
-                        ? new String[]{"Home-button catcher", !serviceOn ? "Not set up" : Prefs.hook(this) ? "On" : "Off"}
-                        : new String[]{"Home app", Mode.isDefaultHome(this) ? "SimpleLauncher" : "Another app"},
-                {"Plex", plexLine}});
+                {"Made by", "Cherry Universe"}});
     }
 
     // ------------------------------------------------------------------ building blocks
