@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -237,18 +238,18 @@ namespace SimpleLauncherHTPC
         /// <summary>A rounded button like the ones at the top of the home screen. Highlighted: white with dark text.</summary>
         public static Clickable Pill(string text, Action click, bool primary = false, double size = 15)
         {
-            var label = T(text, size, primary ? Bg : Text, primary ? FontWeights.SemiBold : FontWeights.Normal);
+            var label = T(text, size, Text, primary ? FontWeights.SemiBold : FontWeights.Normal);
             var c = new Clickable
             {
                 CornerRadius = new CornerRadius(22),
                 Padding = new Thickness(22, 11, 22, 12),
                 MinHeight = 44,
                 Child = label,
-                NormalBackground = primary ? B(Colors.White) : B(A(0xFFFFFF, 0.12)),
+                NormalBackground = B(A(0xFFFFFF, primary ? 0.18 : 0.12)),
                 FocusBackground = B(Colors.White),
                 BorderThickness = new Thickness(0)
             };
-            c.Highlighted = on => label.Foreground = B(on || primary ? Bg : Text);
+            c.Highlighted = on => label.Foreground = B(on ? Bg : Text);
             c.Clicked += click;
             return c;
         }
@@ -262,12 +263,12 @@ namespace SimpleLauncherHTPC
                 Height = 44,
                 CornerRadius = new CornerRadius(22),
                 Child = icon,
-                ToolTip = tooltip,
                 NormalBackground = B(A(0xFFFFFF, 0.12)),
                 FocusBackground = B(Colors.White)
             };
             c.Highlighted = on => icon.Stroke = B(on ? Bg : Text);
             c.Clicked += click;
+            System.Windows.Automation.AutomationProperties.SetName(c, tooltip);
             return c;
         }
 
@@ -534,9 +535,9 @@ namespace SimpleLauncherHTPC
                 Lift = true,
                 FocusBorder = B(Colors.White),
                 Child = inner,
-                Opacity = faded ? 0.55 : 1,
-                ToolTip = name
+                Opacity = faded ? 0.55 : 1
             };
+            System.Windows.Automation.AutomationProperties.SetName(tile, name);
             tile.NormalBackground = ArtBrush(a.Id, art, (int)(w * 2));
             tile.Background = tile.NormalBackground;
             if (click != null) tile.Clicked += click;
@@ -591,9 +592,108 @@ namespace SimpleLauncherHTPC
                 HorizontalScrollBarVisibility = horizontal ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Disabled,
                 Focusable = false,
                 CanContentScroll = false,
-                Padding = new Thickness(14),
-                Margin = new Thickness(-14)
+                Padding = new Thickness(40, 30, 40, 30),
+                Margin = new Thickness(-40, -30, -40, -30)
             };
+        }
+
+        // ------------------------------------------------------------------ clock
+
+        static readonly System.Globalization.CultureInfo UK = new System.Globalization.CultureInfo("en-GB");
+
+        public static string TimeText(DateTime now) => now.ToString(Settings.Current.Clock24 ? "HH:mm" : "h:mm", UK);
+
+        public static string AmPmText(DateTime now) => !Settings.Current.Clock24 && Settings.Current.ShowAmPm ? now.ToString("tt", UK).ToUpperInvariant() : "";
+
+        /// <summary>The date under the clock, as you've chosen it, e.g. "Tuesday 24 November 2026". Null: no date.</summary>
+        public static string DateText(DateTime now)
+        {
+            var s = Settings.Current;
+            var parts = new List<string>();
+            if (s.ShowWeekday) parts.Add(now.ToString("dddd", UK));
+            if (s.ShowDayMonth) parts.Add(now.ToString("d MMMM", UK));
+            if (s.ShowYear) parts.Add(now.ToString("yyyy", UK));
+            return parts.Count > 0 ? string.Join(" ", parts) : null;
+        }
+
+        // ------------------------------------------------------------------ little pictures of the home screen
+
+        /// <summary>A small drawing of the home screen in either layout, like the one in the TV's settings.</summary>
+        public static FrameworkElement LayoutPicture(bool grid, double w, double h, Color bg)
+        {
+            var c = new Canvas { Width = w, Height = h, ClipToBounds = true, Background = B(bg) };
+            double s = w / 1280.0;
+            void R(double x, double y, double rw, double rh, Color col, double r = 3)
+            {
+                var rect = new Rectangle { Width = rw, Height = rh, RadiusX = r, RadiusY = r, Fill = B(col) };
+                Canvas.SetLeft(rect, x);
+                Canvas.SetTop(rect, y);
+                c.Children.Add(rect);
+            }
+            double pad = 56 * s, top = 44 * s;
+            R(pad, top, 150 * s, 48 * s, Track, 4 * s);
+            double bx = w - pad;
+            for (int i = 0; i < 4; i++)
+            {
+                double bw = i == 0 ? 44 * s : 120 * s;
+                R(bx - bw, top + 12 * s, bw, 26 * s, C(0x2A3040), 13 * s);
+                bx -= bw + 14 * s;
+            }
+            double tw = (grid ? 168 : 208) * s, th = tw * 9 / 16, gap = (grid ? 32 : 24) * s;
+            if (grid)
+            {
+                int across = 6;
+                double total = across * tw + (across - 1) * gap;
+                double x0 = (w - total) / 2, y = top + 120 * s;
+                for (int row = 0; row < 3 && y + th < h; row++)
+                {
+                    for (int i = 0; i < across; i++) R(x0 + i * (tw + gap), y, tw, th, row == 0 && i == 0 ? Text : Line);
+                    y += th + 46 * s;
+                }
+            }
+            else
+            {
+                double y = top + 210 * s;
+                for (int i = 0; pad + i * (tw + gap) + tw <= w - pad + 1; i++) R(pad + i * (tw + gap), y, tw, th, i == 0 ? Text : Line);
+            }
+            return c;
+        }
+
+        /// <summary>A small home screen drawn on a colour or photo, for the background picker.</summary>
+        public static FrameworkElement MiniHome(double w)
+        {
+            double s = w / 268.0;
+            var g = new Grid { Margin = new Thickness(12 * s, 11 * s, 12 * s, 0) };
+            var sp = new StackPanel();
+            var top = new StackPanel { Orientation = Orientation.Horizontal };
+            top.Children.Add(Logo(16 * s));
+            var t = T("19:42", 13 * s, Colors.White, FontWeights.Light);
+            t.Margin = new Thickness(7 * s, 0, 0, 0);
+            t.VerticalAlignment = VerticalAlignment.Center;
+            top.Children.Add(t);
+            var bars = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            for (int i = 0; i < 3; i++) bars.Children.Add(new Border { Width = 22 * s, Height = 7 * s, CornerRadius = new CornerRadius(4 * s), Background = B(A(0xFFFFFF, 0.16)), Margin = new Thickness(4 * s, 0, 0, 0) });
+            var head = new Grid();
+            head.Children.Add(top);
+            head.Children.Add(bars);
+            sp.Children.Add(head);
+            var tiles = new UniformGrid { Columns = 4, Margin = new Thickness(0, 14 * s, 0, 0) };
+            for (int i = 0; i < 4; i++)
+            {
+                tiles.Children.Add(new Border
+                {
+                    Height = 26 * s, Margin = new Thickness(0, 0, 5 * s, 0), CornerRadius = new CornerRadius(3 * s),
+                    Background = B(A(0xFFFFFF, i == 0 ? 0.22 : 0.12)),
+                    BorderBrush = B(Colors.White), BorderThickness = new Thickness(i == 0 ? 1.5 : 0)
+                });
+            }
+            sp.Children.Add(tiles);
+            var row = new UniformGrid { Columns = 3, Margin = new Thickness(0, 7 * s, 0, 0) };
+            for (int i = 0; i < 3; i++) row.Children.Add(new Border { Height = 20 * s, Margin = new Thickness(0, 0, 5 * s, 0), CornerRadius = new CornerRadius(3 * s), Background = B(A(0xFFFFFF, 0.08)) });
+            sp.Children.Add(row);
+            g.Children.Add(sp);
+            g.IsHitTestVisible = false;
+            return g;
         }
     }
 }

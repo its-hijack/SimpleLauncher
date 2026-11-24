@@ -247,9 +247,8 @@ namespace SimpleLauncherHTPC
             var accent = Ui.Choice("Accent colour", null, Ui.AccentNames, s.Accent, v => { s.Accent = v; Settings.Save(); Host.Refresh(); });
             accent.Tag = "accent";
             col.Children.Add(accent);
-            var clock = Ui.Toggle("24-hour clock", null, s.Clock24, v => { s.Clock24 = v; Settings.Save(); });
-            clock.Tag = "clock";
-            col.Children.Add(clock);
+            col.Children.Add(Ui.Section("Clock and date", 10));
+            SettingsView.ClockRows(col, this);
             page.Children.Add(Ui.Scroll(col));
         }
 

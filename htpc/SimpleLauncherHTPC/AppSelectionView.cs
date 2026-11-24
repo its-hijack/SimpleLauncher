@@ -12,6 +12,8 @@ namespace SimpleLauncherHTPC
     {
         static readonly string[] Filters = { "All", "Programs", "Store apps", "Websites", "Your own" };
         int filter;
+        List<string> order;          // fixed while the screen is open, so tiles don't jump about
+        List<AppEntry> shown = new List<AppEntry>();
 
         public override void Build()
         {
@@ -66,8 +68,16 @@ namespace SimpleLauncherHTPC
             // The apps
             var wrap = new WrapPanel();
             const double w = 214, h = 116;
-            var apps = Catalog.All().Where(Keep).OrderBy(a => s.Home.Contains(a.Id) ? 0 : 1)
-                .ThenBy(a => s.Home.IndexOf(a.Id)).ThenBy(a => s.NameOf(a), StringComparer.CurrentCultureIgnoreCase).ToList();
+            var all = Catalog.All().ToList();
+            if (order == null)
+            {
+                order = all.OrderBy(a => s.Home.Contains(a.Id) ? 0 : 1).ThenBy(a => s.Home.IndexOf(a.Id))
+                    .ThenBy(a => s.NameOf(a), StringComparer.CurrentCultureIgnoreCase).Select(a => a.Id).ToList();
+            }
+            foreach (var a in all) if (!order.Contains(a.Id)) order.Add(a.Id);
+            var byId = all.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First());
+            var apps = order.Where(byId.ContainsKey).Select(id => byId[id]).Where(Keep).ToList();
+            shown = apps;
             foreach (var a in apps)
             {
                 var app = a;
@@ -104,7 +114,10 @@ namespace SimpleLauncherHTPC
             if (home.Contains(a.Id)) home.Remove(a.Id);
             else home.Add(a.Id);
             Settings.Save();
-            Host.Refresh();
+            // Move on to the next app, so you can work along the row.
+            int i = shown.FindIndex(x => x.Id == a.Id);
+            var next = i >= 0 && i + 1 < shown.Count ? shown[i + 1] : a;
+            Host.Refresh("app:" + next.Id);
             if (home.Contains(a.Id)) FetchArt(a);
         }
 

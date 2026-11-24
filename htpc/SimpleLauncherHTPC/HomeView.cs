@@ -18,7 +18,7 @@ namespace SimpleLauncherHTPC
         static readonly int[] GridCard = { 160, 188, 214, 250, 290 };
         static readonly int[] RowCard = { 200, 230, 260, 300, 340 };
 
-        TextBlock clock, date;
+        TextBlock clock, ampm, date;
         DispatcherTimer tick;
 
         public override bool UsesPhoto => true;
@@ -37,9 +37,15 @@ namespace SimpleLauncherHTPC
             left.Children.Add(Ui.Logo(56));
             var times = new StackPanel { Margin = new Thickness(22, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
             clock = Ui.T("", 44, Colors.White, FontWeights.Light);
+            ampm = Ui.T("", 18, Colors.White, FontWeights.Light);
+            ampm.Margin = new Thickness(6, 0, 0, 5);
+            ampm.VerticalAlignment = VerticalAlignment.Bottom;
             date = Ui.T("", 16, Ui.C(0xC9CFDA));
-            times.Children.Add(clock);
-            if (s.ShowDate) times.Children.Add(date);
+            var timeRow = new StackPanel { Orientation = Orientation.Horizontal };
+            timeRow.Children.Add(clock);
+            timeRow.Children.Add(ampm);
+            times.Children.Add(timeRow);
+            times.Children.Add(date);
             left.Children.Add(times);
             header.Children.Add(left);
             UpdateClock();
@@ -108,6 +114,14 @@ namespace SimpleLauncherHTPC
             double w = grid ? GridTile[size] : RowTile[size];
             double h = Math.Round(w * 9 / 16);
             var sec = new StackPanel();
+            int across = Math.Max(1, (int)Math.Floor((1168 + 32) / (w + 32) + 0.001));
+            if (grid && apps.Count > 0)
+            {
+                // A centred block: as wide as the rows of tiles that fit, so the grid sits in the middle.
+                across = Math.Min(across, apps.Count);
+                sec.Width = across * w + (across - 1) * 32;
+                sec.HorizontalAlignment = HorizontalAlignment.Center;
+            }
             sec.Children.Add(Ui.Section("Your apps", afterWatching ? 26 : 0));
             if (apps.Count == 0)
             {
@@ -129,6 +143,7 @@ namespace SimpleLauncherHTPC
                 var t = Ui.Tile(app, w, h, () => Host.Launch(app), () => AppMenu(app));
                 Ui.TileOf(t).Tag = "app:" + app.Id;
                 t.Margin = grid ? new Thickness(0, 0, 32, 20) : new Thickness(0, 0, 24, 0);
+                if (grid && (holder.Children.Count + 1) % across == 0) t.Margin = new Thickness(0, 0, 0, 20);
                 holder.Children.Add(t);
             }
             sec.Children.Add(grid ? (UIElement)holder : Ui.Scroll(holder, true));
@@ -242,8 +257,12 @@ namespace SimpleLauncherHTPC
         void UpdateClock()
         {
             var now = DateTime.Now;
-            clock.Text = now.ToString(Settings.Current.Clock24 ? "HH:mm" : "h:mm tt", UK);
-            date.Text = now.ToString("dddd d MMMM", UK);
+            clock.Text = Ui.TimeText(now);
+            ampm.Text = Ui.AmPmText(now);
+            ampm.Visibility = ampm.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            string d = Ui.DateText(now);
+            date.Text = d ?? "";
+            date.Visibility = d != null ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public override void Shown()

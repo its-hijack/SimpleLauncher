@@ -99,12 +99,7 @@ namespace SimpleLauncherHTPC
         {
             var s = Settings.Current;
             p.Children.Add(Ui.Section("Layout", 4));
-            p.Children.Add(Tagged(Ui.Choice("Layout", s.Grid ? "Your apps fill the screen in rows" : "One row of apps across the middle",
-                new[] { "Default", "Grid" }, s.Grid ? 1 : 0, v =>
-                {
-                    s.Grid = v == 1;
-                    Settings.Save();
-                }), "layout"));
+            p.Children.Add(LayoutPictures(this));
             p.Children.Add(Tagged(Ui.Steps("App size", s.AppSize, v =>
             {
                 s.AppSize = v;
@@ -146,6 +141,79 @@ namespace SimpleLauncherHTPC
                 int n = await Artwork.FillIn(Catalog.HomeApps());
                 Host.Toast(n == 0 ? "No new artwork found" : n == 1 ? "Found artwork for 1 app" : "Found artwork for " + n + " apps");
             }), "refetch"));
+        }
+
+        /// <summary>The two layouts side by side as little pictures of the home screen. Select one to use it.</summary>
+        public static FrameworkElement LayoutPictures(View view)
+        {
+            var s = Settings.Current;
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+            foreach (bool grid in new[] { false, true })
+            {
+                bool g = grid, on = s.Grid == grid;
+                var pic = Ui.LayoutPicture(g, 240, 135, Ui.C(0x0A0C11));
+                var c = new Clickable
+                {
+                    Width = 252, Height = 147, CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(3), Lift = true,
+                    Padding = new Thickness(3), NormalBorder = Ui.B(on ? Colors.White : Ui.Line), FocusBorder = Ui.B(Colors.White),
+                    Child = new Border { CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = pic }, Tag = g ? "layout:grid" : "layout:default"
+                };
+                c.Clicked += () =>
+                {
+                    s.Grid = g;
+                    Settings.Save();
+                    view.Host.Refresh();
+                };
+                var label = Ui.T(g ? "Grid" : "Default", 15, on ? Colors.White : Ui.Dim, FontWeights.Medium);
+                label.Margin = new Thickness(2, 8, 0, 0);
+                var sub = Ui.T(g ? "Your apps fill the screen in rows" : "One row of apps across the middle", 12, Ui.Label);
+                var sp = new StackPanel { Margin = new Thickness(0, 0, 20, 0) };
+                sp.Children.Add(c);
+                sp.Children.Add(label);
+                sp.Children.Add(sub);
+                row.Children.Add(sp);
+            }
+            return row;
+        }
+
+        /// <summary>The clock and date options, the same as on TV.</summary>
+        public static void ClockRows(Panel p, View view)
+        {
+            var s = Settings.Current;
+            p.Children.Add(Tagged(Ui.Toggle("24-hour clock", null, s.Clock24, v =>
+            {
+                s.Clock24 = v;
+                Settings.Save();
+                view.Host.Refresh();
+            }), "clock24"));
+            if (!s.Clock24)
+            {
+                p.Children.Add(Tagged(Ui.Toggle("Show AM / PM", "Next to the time", s.ShowAmPm, v =>
+                {
+                    s.ShowAmPm = v;
+                    Settings.Save();
+                }), "ampm"));
+            }
+            p.Children.Add(Ui.Section("Date"));
+            string now = Ui.DateText(DateTime.Now) ?? "Date hidden";
+            p.Children.Add(Tagged(Ui.Toggle("Show the day of the week", "Now showing: " + now, s.ShowWeekday, v =>
+            {
+                s.ShowWeekday = v;
+                Settings.Save();
+                view.Host.Refresh();
+            }), "weekday"));
+            p.Children.Add(Tagged(Ui.Toggle("Show the day and month", null, s.ShowDayMonth, v =>
+            {
+                s.ShowDayMonth = v;
+                Settings.Save();
+                view.Host.Refresh();
+            }), "daymonth"));
+            p.Children.Add(Tagged(Ui.Toggle("Show the year", null, s.ShowYear, v =>
+            {
+                s.ShowYear = v;
+                Settings.Save();
+                view.Host.Refresh();
+            }), "year"));
         }
 
         void KeyDialog()
@@ -190,16 +258,7 @@ namespace SimpleLauncherHTPC
                 Host.Refresh();
             }), "accent"));
             p.Children.Add(Ui.Section("Clock"));
-            p.Children.Add(Tagged(Ui.Toggle("24-hour clock", null, s.Clock24, v =>
-            {
-                s.Clock24 = v;
-                Settings.Save();
-            }), "clock24"));
-            p.Children.Add(Tagged(Ui.Toggle("Show the date", "Under the clock", s.ShowDate, v =>
-            {
-                s.ShowDate = v;
-                Settings.Save();
-            }), "date"));
+            ClockRows(p, this);
         }
 
         // ------------------------------------------------------------------ Windows

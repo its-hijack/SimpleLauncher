@@ -69,7 +69,7 @@ namespace SimpleLauncherHTPC
                     {
                         s.BgMode = "wallpaper";
                         Apply();
-                    }, null, "wallpaper"));
+                    }, null, "wallpaper", true));
                 }
                 foreach (string ph in s.Photos.Where(File.Exists).ToList())
                 {
@@ -89,7 +89,7 @@ namespace SimpleLauncherHTPC
                             Apply();
                         }),
                         ("Cancel", null)
-                    }), "photo:" + path));
+                    }), "photo:" + path, true));
                 }
             }
             body.Children.Add(wrap);
@@ -118,9 +118,11 @@ namespace SimpleLauncherHTPC
             Host.Refresh();
         }
 
-        FrameworkElement Card(string name, string sub, Brush fill, bool current, Action pick, Action menu, string tag)
+        FrameworkElement Card(string name, string sub, Brush fill, bool current, Action pick, Action menu, string tag, bool photo = false)
         {
-            var inner = new Grid();
+            var inner = new Grid { ClipToBounds = true };
+            if (photo) inner.Children.Add(new Border { Background = Brushes.Black, Opacity = Ui.DimLevels[Ui.Clamp(Settings.Current.Dim, 4)], CornerRadius = new CornerRadius(7) });
+            inner.Children.Add(Ui.MiniHome(W - 6));
             if (current)
             {
                 inner.Children.Add(new Border

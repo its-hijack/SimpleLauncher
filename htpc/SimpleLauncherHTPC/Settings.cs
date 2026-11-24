@@ -63,7 +63,10 @@ namespace SimpleLauncherHTPC
         public int Dim { get; set; } = 2;
         public int Fit { get; set; }
         public bool Clock24 { get; set; } = true;
-        public bool ShowDate { get; set; } = true;
+        public bool ShowAmPm { get; set; } = true;
+        public bool ShowWeekday { get; set; } = true;
+        public bool ShowDayMonth { get; set; } = true;
+        public bool ShowYear { get; set; }
 
         // Windows
         public bool FullScreen { get; set; } = true;

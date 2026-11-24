@@ -260,10 +260,10 @@ namespace SimpleLauncherHTPC
         }
 
         /// <summary>Lays the current screen out again, keeping the highlight where it was.</summary>
-        public void Refresh()
+        public void Refresh(string focusTag = null)
         {
             if (Current == null) return;
-            string tag = (Keyboard.FocusedElement as FrameworkElement)?.Tag as string;
+            string tag = focusTag ?? (Keyboard.FocusedElement as FrameworkElement)?.Tag as string;
             Present(Current, false, tag);
         }
 
