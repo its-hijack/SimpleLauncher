@@ -446,15 +446,16 @@ public class SettingsActivity extends Screen {
                     serviceOn ? "Replaces Google's home screen with this one"
                             : "Google TV ignores the home app setting, so HomeCatch catches the Home button",
                     Prefs.hook(this) && serviceOn, this::setHook);
-            if (!serviceOn) {
-                valueRow("accessibility", "Switch on HomeCatch",
-                        "In Accessibility, turn on \"SimpleLauncher – HomeCatch\"", "Open", () -> {
-                            Prefs.setBool(this, Prefs.HOOK, true);
-                            if (!HomeButtonService.openAccessibilitySettings(this)) {
-                                Apps.toast(this, "Couldn't open Accessibility settings");
-                            }
-                        });
-            }
+            // Always shown, so HomeCatch can be switched off at the source as well as switched on.
+            valueRow("accessibility", serviceOn ? "Accessibility settings" : "Switch on HomeCatch",
+                    serviceOn ? "To remove HomeCatch, turn off \"SimpleLauncher – HomeCatch\" here"
+                            : "In Accessibility, turn on \"SimpleLauncher – HomeCatch\"",
+                    "Open", () -> {
+                        if (!serviceOn) Prefs.setBool(this, Prefs.HOOK, true);
+                        if (!HomeButtonService.openAccessibilitySettings(this)) {
+                            Apps.toast(this, "Couldn't open Accessibility settings");
+                        }
+                    });
             String status = !serviceOn ? "Not set up" : Prefs.hook(this) ? "Running" : "Switched off";
             valueRow("status", "Status", null, status, null);
         }
