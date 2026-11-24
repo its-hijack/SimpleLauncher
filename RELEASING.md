@@ -60,3 +60,22 @@ file and commit the result. Each release also runs it and attaches `SimpleScript
 
 `docs/home-screen.png` is rendered from `docs/home-screen.html`. When the home screen's design changes,
 update that HTML to match and run `bash docs/render.sh` (needs Google Chrome), then commit both.
+
+## SimpleLauncher for Windows (htpc/)
+
+The Windows version lives in `htpc/` and is released separately, so TVs never see it as an update.
+
+- **Version:** `htpc/version.txt` holds the build, `DDMMYY-build` (for example `241126-1.1`).
+  The workflow writes it into `BuildInfo.cs`; you don't need to change that file.
+- **Publishing:** set the build in `htpc/version.txt`, push, then **Actions › Build and release (Windows) ›
+  Run workflow**. It makes the release `htpc-<build>` with `SimpleLauncherHTPC-<build>-Setup.exe`, and it's
+  never marked "latest", so the Android app's updater keeps finding the TV releases.
+- **Every push** that touches `htpc/` builds it too (no release) and keeps the installer on the run's page
+  under Artifacts, so you can try a build before publishing it.
+- **Artwork key (optional):** add a SteamGridDB API key as the repository secret `SGDB_API_KEY` and it's
+  built in. Without it, people add their own key in Settings › Home screen.
+- **How PCs get the update:** Settings › Information › Software update looks for the newest `htpc-`
+  release, downloads the installer and runs it quietly, then SimpleLauncher reopens.
+- **Built with** C# / .NET 8 (WPF), as one self-contained file, wrapped in an Inno Setup installer
+  (`htpc/installer/SimpleLauncherHTPC.iss`). No code signing yet.
+

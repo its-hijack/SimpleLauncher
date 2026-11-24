@@ -94,6 +94,26 @@ use SimpleScript instead.
 Once installed, SimpleLauncher updates itself when you ask:
 **Settings › Information › Software update**. Your apps and settings are kept.
 
+## SimpleLauncher for Windows (HTPC)
+
+There's also a version for Windows PCs plugged into a TV. It has the same look, plus a few things that
+suit a PC:
+
+- **Finds your apps by itself.** Everything in your Start menu, Microsoft Store apps included. You can add
+  your own programs, games and websites too.
+- **Artwork from the internet.** Each app gets a picture found online by its name, or one you choose.
+- **Your own photo as the background,** or your Windows wallpaper.
+- **Mouse, keyboard, remote or controller.** Tiles lift and glow as you move over them.
+- **Gets you back.** It can start with Windows and come back when you close an app.
+  Ctrl + Alt + Home, or holding View + Menu on a controller, brings it back from anywhere.
+- **Console mode** (optional): starts SimpleLauncher instead of the Windows desktop, like a games console.
+  The Desktop button still opens the normal desktop whenever you want it.
+
+To install it, download **SimpleLauncherHTPC-…-Setup.exe** from the newest release whose name starts with
+"SimpleLauncher for Windows" on the [releases page](../../releases) and run it. It needs 64-bit Windows 10 or 11.
+It isn't code-signed yet, so Windows may say "Windows protected your PC" the first time: choose
+**More info › Run anyway**. Updates: **Settings › Information › Software update**.
+
 ---
 
 <sub>SimpleLauncher is an independent project and isn't affiliated with Amazon or Plex.</sub>
