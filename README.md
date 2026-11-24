@@ -33,10 +33,12 @@ for devices that have been tested, so nothing can go wrong on the rest.
 | Fire TV Stick HD | AFTSS | Fire OS 7 | ✓ | ✓ |
 | Fire TV Stick 4K Max (2nd Gen) | AFTKRT | Fire OS 8 | ✓ | ✓ |
 | Other Fire TV devices | | | ✓ (as an app) | Not yet |
-| Android TV, Google TV, phones and tablets (Android 7.1+) | | | ✓ (as your home screen) | Not needed |
+| Google TV and Android TV | | | ✓ (as your home screen) | Being tested |
+| Other Android devices, phones and tablets (Android 7.1+) | | | ✓ (as your home screen) | Not needed |
 
-- **HomeCatch** makes the Home button on a Fire TV remote open SimpleLauncher instead of Amazon's home
-  screen. Other Android devices let you choose your home screen anyway, so they don't need it.
+- **HomeCatch** makes the Home button on your remote open SimpleLauncher instead of Amazon's home
+  screen on a Fire TV, or Google's on a Google TV (which ignores the home app setting). Other Android
+  devices let you choose your home screen anyway, so they don't need it.
 
 Want your device supported? [Open an issue](../../issues) with its name and model code. SimpleScript
 shows the model code when it connects.
@@ -80,6 +82,12 @@ normally sideload apps (for example with Downloader on a Fire TV, or `adb instal
 
 This gives you SimpleLauncher as an app. On a Fire TV, HomeCatch needs a permission only a computer
 can grant, so run SimpleScript once if you want the Home button to open SimpleLauncher.
+
+On a Google TV you can switch HomeCatch on from the TV itself: in SimpleLauncher go to
+Settings › Danger Zone › Switch on HomeCatch, and turn on "SimpleLauncher – HomeCatch". If that switch
+is greyed out (newer Google TVs block it for apps installed outside the Play Store), open
+SimpleLauncher's app info in the TV's settings, choose "Allow restricted settings" if it's there, and try again, or
+use SimpleScript instead.
 
 ### Updating
 

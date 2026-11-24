@@ -443,7 +443,7 @@ device_label() {
 # =====================================================================================
 MODEL=""; MAKER=""; DEVICE_NAME=""; ANDROID=""; SDK=0; FIRE_OS=""; FIRE_MAJOR=0
 SUPPORT="none"        # full, testing, app, generic
-SUPPORTED_NAME=""; CAN_DEBLOAT=no; CAN_HOMECATCH=no; SUPPORT_REASON=""
+SUPPORTED_NAME=""; CAN_DEBLOAT=no; CAN_HOMECATCH=no; SUPPORT_REASON=""; GOOGLE_TV=no
 
 fire_major_from_sdk() {
   case "$1" in
@@ -491,6 +491,10 @@ detect_device() {
     fi
   else
     SUPPORT="generic"
+    # Google TV / Android TV ignore the home app setting, so HomeCatch (being tested) does the job.
+    if S pm list packages | tr -d '\r' | grep -qE '^package:com\.google\.android\.(apps\.tv\.launcherx|tvlauncher|leanbacklauncher)$'; then
+      GOOGLE_TV=yes; CAN_HOMECATCH=yes
+    fi
   fi
 
   blank
@@ -525,7 +529,15 @@ detect_device() {
       note "Want it supported? Tell us the model ($MODEL) at $REPO_URL/issues"
       ;;
     generic)
-      ok "SimpleLauncher can be your home screen on this device"
+      if [ "$GOOGLE_TV" = "yes" ]; then
+        ok "SimpleLauncher can be your home screen on this Google TV"
+        warn "HomeCatch is being tested on Google TV."
+        note "Google TV ignores the home app setting, so HomeCatch makes the Home button open"
+        note "SimpleLauncher. If anything doesn't work, switch it off in Settings › Danger Zone"
+        note "and tell us at $REPO_URL/issues"
+      else
+        ok "SimpleLauncher can be your home screen on this device"
+      fi
       ;;
   esac
 
@@ -838,12 +850,13 @@ install_launcher() {
 
   # Ask everything up front, then do it all in one go.
   local want_homecatch=no block_updates=no
-  if [ "$CAN_HOMECATCH" = "yes" ] && { [ "$SUPPORT" = "full" ] || [ "$SUPPORT" = "testing" ]; }; then
+  if [ "$CAN_HOMECATCH" = "yes" ] && { [ "$SUPPORT" = "full" ] || [ "$SUPPORT" = "testing" ] || [ "$GOOGLE_TV" = "yes" ]; }; then
+    local whose="Amazon's"; [ "$GOOGLE_TV" = "yes" ] && whose="Google's"
     blank
     say "  ${B}HomeCatch${R} makes the Home button on your remote open SimpleLauncher"
-    say "  instead of Amazon's home screen. You can switch it off any time in"
+    say "  instead of $whose home screen. You can switch it off any time in"
     say "  SimpleLauncher's Settings › Danger Zone."
-    [ "$SUPPORT" = "testing" ] && say "  ${D}It's still being tested on this device.${R}"
+    { [ "$SUPPORT" = "testing" ] || [ "$GOOGLE_TV" = "yes" ]; } && say "  ${D}It's still being tested on this device.${R}"
     ask_yn "Switch HomeCatch on?" y && want_homecatch=yes
 
     if installed "$UPDATER_PKG"; then
@@ -914,11 +927,20 @@ install_launcher() {
       fi
       ;;
     generic)
-      blank
-      say "  To make SimpleLauncher your home screen, choose it on the TV:"
-      S am start -a android.settings.HOME_SETTINGS >/dev/null 2>&1
-      say "  ${B}Settings › Apps › Default apps › Home app › SimpleLauncher${R}"
-      dim "  (I've tried to open that screen for you. Some TVs keep it somewhere else.)"
+      if [ "$GOOGLE_TV" = "yes" ]; then
+        if [ "$want_homecatch" = "yes" ]; then
+          S pm grant "$SL_PKG" android.permission.WRITE_SECURE_SETTINGS >/dev/null
+          if homecatch_on; then ok "HomeCatch on"; else bad "Google TV didn't accept HomeCatch"; fi
+        else
+          note "HomeCatch is off. You can switch it on later in SimpleLauncher's Settings › Danger Zone."
+        fi
+      else
+        blank
+        say "  To make SimpleLauncher your home screen, choose it on the TV:"
+        S am start -a android.settings.HOME_SETTINGS >/dev/null 2>&1
+        say "  ${B}Settings › Apps › Default apps › Home app › SimpleLauncher${R}"
+        dim "  (I've tried to open that screen for you. Some TVs keep it somewhere else.)"
+      fi
       ;;
   esac
 

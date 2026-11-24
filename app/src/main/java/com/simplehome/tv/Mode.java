@@ -55,6 +55,12 @@ final class Mode {
         return isFireTvDevice(c);
     }
 
+    /** A Google TV or Android TV with Google's own home screen installed. */
+    static boolean googleTv(Context c) {
+        for (String pkg : Apps.GOOGLE_LAUNCHERS) if (isInstalled(c, pkg)) return true;
+        return false;
+    }
+
     static String name(Context c) {
         return fireTv(c) ? "Fire TV mode" : "Generic mode";
     }

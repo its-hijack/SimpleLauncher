@@ -438,13 +438,35 @@ public class SettingsActivity extends Screen {
     }
 
     private void homeApp() {
-        section("HOME APP", true);
+        boolean google = Mode.googleTv(this);
+        if (google) {
+            boolean serviceOn = HomeButtonService.isEnabled(this);
+            section("HOMECATCH", true);
+            toggleRow("hook", "Open SimpleLauncher when Home is pressed",
+                    serviceOn ? "Replaces Google's home screen with this one"
+                            : "Google TV ignores the home app setting, so HomeCatch catches the Home button",
+                    Prefs.hook(this) && serviceOn, this::setHook);
+            if (!serviceOn) {
+                valueRow("accessibility", "Switch on HomeCatch",
+                        "In Accessibility, turn on \"SimpleLauncher – HomeCatch\"", "Open", () -> {
+                            Prefs.setBool(this, Prefs.HOOK, true);
+                            if (!HomeButtonService.openAccessibilitySettings(this)) {
+                                Apps.toast(this, "Couldn't open Accessibility settings");
+                            }
+                        });
+            }
+            String status = !serviceOn ? "Not set up" : Prefs.hook(this) ? "Running" : "Switched off";
+            valueRow("status", "Status", null, status, null);
+        }
+        section("HOME APP", !google);
         boolean isHome = Mode.isDefaultHome(this);
         valueRow("default_home", "Use SimpleLauncher as your home screen",
                 isHome ? "SimpleLauncher opens when you press Home" : "Choose SimpleLauncher in Android's home app settings",
                 isHome ? "On" : "Set it up", () -> Mode.openHomeAppPicker(this));
-        valueRow("return_home", "Return home", "Opens your device's original home screen", "Try it",
-                () -> Mode.openOriginalHome(this));
+        valueRow("return_home", "Return home", "Opens your device's original home screen", "Try it", () -> {
+            HomeButtonService.allowAmazonHome();
+            Mode.openOriginalHome(this);
+        });
     }
 
     // ------------------------------------------------------------------ External Services
@@ -741,8 +763,10 @@ public class SettingsActivity extends Screen {
                 if (!Apps.tryStart(this, new Intent(android.provider.Settings.ACTION_SETTINGS)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))) Apps.toast(this, "Couldn't open settings");
             });
-            valueRow("original_home", "Original home screen", "Same as the Return home button", "Open",
-                    () -> Mode.openOriginalHome(this));
+            valueRow("original_home", "Original home screen", "Same as the Return home button", "Open", () -> {
+                HomeButtonService.allowAmazonHome();
+                Mode.openOriginalHome(this);
+            });
         }
         valueRow("app_info", "SimpleLauncher app info", "Force stop or clear SimpleLauncher if it misbehaves", "Open",
                 () -> Apps.openAppInfo(this, getPackageName()));
@@ -1005,7 +1029,11 @@ public class SettingsActivity extends Screen {
     private void setHook(boolean on) {
         Prefs.setBool(this, Prefs.HOOK, on);
         if (on && !HomeButtonService.isEnabled(this) && !HomeButtonService.enable(this)) {
-            Apps.toast(this, "Set up HomeCatch from your computer over ADB first");
+            if (!Mode.fireTv(this) && HomeButtonService.openAccessibilitySettings(this)) {
+                Apps.toast(this, "Turn on \"SimpleLauncher – HomeCatch\" here");
+            } else {
+                Apps.toast(this, "Set up HomeCatch from your computer over ADB first");
+            }
         }
     }
 

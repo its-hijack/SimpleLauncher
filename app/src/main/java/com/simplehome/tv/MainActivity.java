@@ -98,6 +98,7 @@ public class MainActivity extends Activity {
                 HomeButtonService.allowAmazonHome();
                 Apps.openAmazonHome(this);
             } else {
+                HomeButtonService.allowAmazonHome();
                 Mode.openOriginalHome(this);
             }
         });

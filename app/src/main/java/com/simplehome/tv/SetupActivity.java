@@ -967,6 +967,9 @@ public class SetupActivity extends Screen {
         if (Mode.fireTv(this)) {
             homeLine = HomeButtonService.isEnabled(this) && Prefs.hook(this) ? "Opens SimpleLauncher"
                     : "Not set up yet: set it up from your computer over ADB";
+        } else if (Mode.googleTv(this)) {
+            homeLine = HomeButtonService.isEnabled(this) && Prefs.hook(this) ? "HomeCatch opens SimpleLauncher"
+                    : "Switch on HomeCatch in Settings → Danger Zone";
         } else {
             homeLine = Mode.isDefaultHome(this) ? "SimpleLauncher is your home app" : "Choose it in Settings → Danger Zone";
         }
@@ -982,7 +985,7 @@ public class SetupActivity extends Screen {
                         + colourName(Ui.ACCENT_NAMES, Ui.ACCENT_COLORS, Prefs.accent(this)) + " · "
                         + (Prefs.clock24(this) ? "24-hour clock" : "12-hour clock")},
                 {"Services", servicesLine},
-                {Mode.fireTv(this) ? "HomeCatch" : "Home app", homeLine}};
+                {Mode.fireTv(this) || Mode.googleTv(this) ? "HomeCatch" : "Home app", homeLine}};
         for (int i = 0; i < lines.length; i++) {
             LinearLayout line = new LinearLayout(this);
             line.setOrientation(LinearLayout.HORIZONTAL);

@@ -1,4 +1,4 @@
-# =====================================================================================
+﻿# =====================================================================================
 #  SimpleScript for Windows, by Cherry Universe
 #  Sets up SimpleLauncher on your TV, step by step: gets the tools your PC needs,
 #  connects to your TV, then installs SimpleLauncher. Supported devices get extras.
@@ -308,7 +308,7 @@ function Prepare-AndConnect {
 #  Step 4: what is it, and what's it allowed
 # =====================================================================================
 $script:Model = ''; $script:Sdk = 0; $script:Support = 'none'
-$script:SupportedName = ''; $script:CanDebloat = $false; $script:CanHomeCatch = $false; $script:FireMajor = 0; $script:IsFire = $false; $script:Forcing = $false
+$script:SupportedName = ''; $script:CanDebloat = $false; $script:CanHomeCatch = $false; $script:FireMajor = 0; $script:IsFire = $false; $script:Forcing = $false; $script:GoogleTv = $false
 
 function FireMajor([int]$sdk) {
     switch ($sdk) { 22 { return 5 } 25 { return 6 } 28 { return 7 } 30 { return 8 } default { return 0 } }
@@ -357,6 +357,11 @@ function Detect-Device {
         $script:FireMajor = $major
     } else {
         $script:Support = 'generic'
+        # Google TV / Android TV ignore the home app setting, so HomeCatch (being tested) does the job.
+        $pk = PackageSet
+        foreach ($g in @('com.google.android.apps.tv.launcherx', 'com.google.android.tvlauncher', 'com.google.android.leanbacklauncher')) {
+            if ($pk.ContainsKey($g)) { $script:GoogleTv = $true; $script:CanHomeCatch = $true }
+        }
     }
 
     $nick = if ($name) { "  $Dot  `"$name`"" } else { '' }
@@ -383,7 +388,17 @@ function Detect-Device {
             Note "that haven't been tested yet, so nothing can go wrong."
             Note "Want it supported? Tell us the model ($($script:Model)) at $RepoUrl/issues"
         }
-        'generic' { Ok 'SimpleLauncher can be your home screen on this device' }
+        'generic' {
+            if ($script:GoogleTv) {
+                Ok 'SimpleLauncher can be your home screen on this Google TV'
+                Warn 'HomeCatch is being tested on Google TV.'
+                Note "Google TV ignores the home app setting, so HomeCatch makes the Home button open"
+                Note "SimpleLauncher. If anything doesn't work, switch it off in Settings $Arrow Danger Zone"
+                Note "and tell us at $RepoUrl/issues"
+            } else {
+                Ok 'SimpleLauncher can be your home screen on this device'
+            }
+        }
     }
     if ($script:Sdk -gt 0 -and $script:Sdk -lt 25) {
         Blank
@@ -655,12 +670,13 @@ function Install-Launcher {
 
     # Ask everything up front, then do it all in one go.
     $wantHomeCatch = $false; $blockUpdates = $false
-    if ($script:CanHomeCatch -and ($script:Support -eq 'full' -or $script:Support -eq 'testing')) {
+    if ($script:CanHomeCatch -and ($script:Support -eq 'full' -or $script:Support -eq 'testing' -or $script:GoogleTv)) {
+        $whose = if ($script:GoogleTv) { "Google's" } else { "Amazon's" }
         Blank
         Say '  HomeCatch makes the Home button on your remote open SimpleLauncher'
-        Say "  instead of Amazon's home screen. You can switch it off any time in"
+        Say "  instead of $whose home screen. You can switch it off any time in"
         Say "  SimpleLauncher's Settings $Arrow Danger Zone."
-        if ($script:Support -eq 'testing') { Dim "  It's still being tested on this device." }
+        if ($script:Support -eq 'testing' -or $script:GoogleTv) { Dim "  It's still being tested on this device." }
         $wantHomeCatch = AskYN 'Switch HomeCatch on?' 'y'
         if ((PackageSet).ContainsKey($UpdaterPkg)) {
             if ((PackageSet '-d').ContainsKey($UpdaterPkg)) {
@@ -725,11 +741,20 @@ function Install-Launcher {
             }
         }
         'generic' {
-            Blank
-            Say '  To make SimpleLauncher your home screen, choose it on the TV:'
-            S am start -a android.settings.HOME_SETTINGS | Out-Null
-            Say "  Settings $Arrow Apps $Arrow Default apps $Arrow Home app $Arrow SimpleLauncher"
-            Dim "  (I've tried to open that screen for you. Some TVs keep it somewhere else.)"
+            if ($script:GoogleTv) {
+                if ($wantHomeCatch) {
+                    S pm grant $SlPkg android.permission.WRITE_SECURE_SETTINGS | Out-Null
+                    if (HomeCatch-On) { Ok 'HomeCatch on' } else { Bad "Google TV didn't accept HomeCatch" }
+                } else {
+                    Note "HomeCatch is off. You can switch it on later in SimpleLauncher's Settings $Arrow Danger Zone."
+                }
+            } else {
+                Blank
+                Say '  To make SimpleLauncher your home screen, choose it on the TV:'
+                S am start -a android.settings.HOME_SETTINGS | Out-Null
+                Say "  Settings $Arrow Apps $Arrow Default apps $Arrow Home app $Arrow SimpleLauncher"
+                Dim "  (I've tried to open that screen for you. Some TVs keep it somewhere else.)"
+            }
         }
     }
     S am start -n "$SlPkg/.MainActivity" | Out-Null

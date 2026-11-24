@@ -29,7 +29,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Brings SimpleLauncher back whenever Amazon's home screen appears.
+ * Brings SimpleLauncher back whenever the device's own home screen appears: Amazon's on a
+ * Fire TV, or Google's on a Google TV / Android TV (which ignore the home app setting).
  *
  * After Home is pressed, Android holds back app launches for about five seconds
  * (a built-in rule for apps that aren't part of the system), so SimpleLauncher can't
@@ -50,7 +51,8 @@ public class HomeButtonService extends AccessibilityService {
     /** Pop-ups that don't count as leaving Amazon's home screen. */
     private static final Set<String> OVERLAYS = new HashSet<>(Arrays.asList(
             "android", "com.android.systemui", "com.amazon.vizzini",
-            "com.amazon.tv.notificationcenter", "com.amazon.tv.quicksettings.ui"));
+            "com.amazon.tv.notificationcenter", "com.amazon.tv.quicksettings.ui",
+            "com.google.android.tvrecommendations", "com.android.tv.systemui"));
 
     private static HomeButtonService instance;
 
@@ -91,7 +93,7 @@ public class HomeButtonService extends AccessibilityService {
         super.onDestroy();
     }
 
-    /** Called by SimpleLauncher's "Amazon Home" button just before it opens Amazon's home screen. */
+    /** Called by the "Amazon Home" / "Return home" button just before it opens the original home screen. */
     static void allowAmazonHome() {
         HomeButtonService s = instance;
         if (s == null) return;
@@ -105,13 +107,14 @@ public class HomeButtonService extends AccessibilityService {
     // Used if Fire OS passes the Home key to us (some versions do).
     @Override
     public boolean onKeyEvent(KeyEvent event) {
-        if (event.getKeyCode() != KeyEvent.KEYCODE_HOME || !Prefs.hook(this) || !Mode.fireTv(this)) return false;
+        if (event.getKeyCode() != KeyEvent.KEYCODE_HOME || !Prefs.hook(this)) return false;
+        boolean fire = Mode.fireTv(this);
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             if (event.getRepeatCount() == 0) homeDownAt = event.getEventTime();
             return true;
         }
         if (event.getAction() == KeyEvent.ACTION_UP) {
-            if (event.getEventTime() - homeDownAt >= LONG_PRESS_MS) {
+            if (fire && event.getEventTime() - homeDownAt >= LONG_PRESS_MS) {
                 Apps.openFireSettings(this);
             } else {
                 openLauncher();
@@ -123,10 +126,12 @@ public class HomeButtonService extends AccessibilityService {
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null || event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
-        if (!Prefs.hook(this) || !Mode.fireTv(this)) return;
+        if (!Prefs.hook(this)) return;
         String pkg = event.getPackageName() != null ? event.getPackageName().toString() : null;
         String cls = event.getClassName() != null ? event.getClassName().toString() : null;
-        boolean amazon = Apps.AMAZON_LAUNCHER.equals(pkg);
+        // "amazon" means the device's own home screen: Amazon's on Fire TV, Google's elsewhere.
+        boolean amazon = Mode.fireTv(this) ? Apps.AMAZON_LAUNCHER.equals(pkg)
+                : pkg != null && Apps.GOOGLE_LAUNCHERS.contains(pkg);
 
         if (pass && SystemClock.uptimeMillis() - passSince > PASS_MAX_MS) pass = false;
         if (pass) {
@@ -272,7 +277,7 @@ public class HomeButtonService extends AccessibilityService {
         return false;
     }
 
-    /** Needs WRITE_SECURE_SETTINGS, which the setup script grants over ADB. */
+    /** Needs WRITE_SECURE_SETTINGS, granted over ADB. Without it, see openAccessibilitySettings. */
     static boolean enable(Context c) {
         try {
             ContentResolver cr = c.getContentResolver();
@@ -285,5 +290,10 @@ public class HomeButtonService extends AccessibilityService {
         } catch (SecurityException e) {
             return false;
         }
+    }
+
+    /** Android's Accessibility settings, where HomeCatch can be switched on by hand (not on Fire TV). */
+    static boolean openAccessibilitySettings(Context c) {
+        return Apps.tryStart(c, new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
 }

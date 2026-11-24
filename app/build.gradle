@@ -11,8 +11,8 @@ plugins {
 // Raise versionCode by 1 for every build you install or release.
 // ---------------------------------------------------------------------------------------
 def releaseVersion = 'V1'
-def buildDate = '231126'
-def buildVersion = '3.1'
+def buildDate = '241126'
+def buildVersion = '3.2'
 
 android {
     namespace 'com.simplehome.tv'
@@ -22,7 +22,7 @@ android {
         applicationId 'com.simplehome.tv'
         minSdk 25          // Fire OS 6+
         targetSdk 28       // Fire OS 7 (Android 9)
-        versionCode 15
+        versionCode 16
         versionName "${releaseVersion} (${buildDate}-${buildVersion})"
 
         // Shown in Settings → Information

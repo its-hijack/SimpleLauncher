@@ -25,6 +25,13 @@ final class Apps {
     static final String AMAZON_LAUNCHER = "com.amazon.tv.launcher";
     static final String FIRE_SETTINGS = "com.amazon.tv.settings.v2";
 
+    /** Google TV and Android TV's own home screens, which ignore the home app setting. */
+    static final Set<String> GOOGLE_LAUNCHERS = new HashSet<>(Arrays.asList(
+            "com.google.android.apps.tv.launcherx",   // Google TV
+            "com.google.android.tvlauncher",          // Android TV 8+
+            "com.google.android.leanbacklauncher"     // older Android TV
+    ));
+
     /** Never shown as tiles. */
     private static final Set<String> EXCLUDED = new HashSet<>(Arrays.asList(
             AMAZON_LAUNCHER,
