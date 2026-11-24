@@ -10,9 +10,11 @@ import android.os.Build;
 import java.util.List;
 
 /**
- * Fire TV mode or generic mode.
+ * Fire TV mode, Google TV mode or generic mode.
  *
  * Fire TV mode: HomeCatch (the Home-button catcher), the "Amazon Home" button, Fire OS details.
+ * Google TV mode (Google TV / Android TV, which ignore the home app setting): HomeCatch, switched
+ * on in Accessibility, and a "Google Home" button.
  * Generic mode (any other Android device): no catcher, "Return home" opens the
  * device's original home screen, and Settings offers Android's home-app picker.
  *
@@ -23,7 +25,7 @@ final class Mode {
     static final int AUTO = 0;
     static final int FIRE_TV = 1;
     static final int GENERIC = 2;
-    static final String[] CHOICES = {"Automatic", "Fire TV mode", "Generic mode"};
+    static final int GOOGLE_TV = 3;   // added later, so the saved numbers above stay the same
 
     private Mode() {
     }
@@ -51,18 +53,41 @@ final class Mode {
     static boolean fireTv(Context c) {
         int o = override(c);
         if (o == FIRE_TV) return true;
-        if (o == GENERIC) return false;
+        if (o != AUTO) return false;
         return isFireTvDevice(c);
     }
 
-    /** A Google TV or Android TV with Google's own home screen installed. */
-    static boolean googleTv(Context c) {
+    /** True on a Google TV or Android TV with Google's own home screen installed. */
+    static boolean isGoogleTvDevice(Context c) {
         for (String pkg : Apps.GOOGLE_LAUNCHERS) if (isInstalled(c, pkg)) return true;
         return false;
     }
 
+    /** True when running in Google TV mode. */
+    static boolean googleTv(Context c) {
+        int o = override(c);
+        if (o == GOOGLE_TV) return true;
+        if (o != AUTO) return false;
+        return !isFireTvDevice(c) && isGoogleTvDevice(c);
+    }
+
+    static String name(int mode) {
+        switch (mode) {
+            case FIRE_TV: return "Fire TV mode";
+            case GOOGLE_TV: return "Google TV mode";
+            default: return "Generic mode";
+        }
+    }
+
+    /** The mode automatic detection picks on this device. */
+    static int detectedMode(Context c) {
+        if (isFireTvDevice(c)) return FIRE_TV;
+        if (isGoogleTvDevice(c)) return GOOGLE_TV;
+        return GENERIC;
+    }
+
     static String name(Context c) {
-        return fireTv(c) ? "Fire TV mode" : "Generic mode";
+        return fireTv(c) ? name(FIRE_TV) : googleTv(c) ? name(GOOGLE_TV) : name(GENERIC);
     }
 
     /** What the device looks like, e.g. "Fire TV Stick HD / Lite (AFTSS)" or "Samsung SM-X200". */
@@ -76,7 +101,7 @@ final class Mode {
 
     /** The label for the top-right button on the home screen. */
     static String homeButtonLabel(Context c) {
-        return fireTv(c) ? "Amazon Home" : "Return home";
+        return fireTv(c) ? "Amazon Home" : googleTv(c) ? "Google Home" : "Return home";
     }
 
     static boolean isInstalled(Context c, String pkg) {
@@ -108,6 +133,14 @@ final class Mode {
 
     /** "Return home": opens the device's original home screen (any home app that isn't SimpleLauncher). */
     static void openOriginalHome(Context c) {
+        if (googleTv(c)) {   // straight to Google's home screen, in case another launcher is installed
+            for (String pkg : Apps.GOOGLE_LAUNCHERS) {
+                if (!isInstalled(c, pkg)) continue;
+                Intent g = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(pkg)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (Apps.tryStart(c, g)) return;
+            }
+        }
         Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
         List<ResolveInfo> homes = c.getPackageManager().queryIntentActivities(home, 0);
         for (ResolveInfo ri : homes) {

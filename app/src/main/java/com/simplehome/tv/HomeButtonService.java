@@ -93,7 +93,7 @@ public class HomeButtonService extends AccessibilityService {
         super.onDestroy();
     }
 
-    /** Called by the "Amazon Home" / "Return home" button just before it opens the original home screen. */
+    /** Called by the "Amazon Home" / "Google Home" button just before it opens the original home screen. */
     static void allowAmazonHome() {
         HomeButtonService s = instance;
         if (s == null) return;
@@ -131,7 +131,7 @@ public class HomeButtonService extends AccessibilityService {
         String cls = event.getClassName() != null ? event.getClassName().toString() : null;
         // "amazon" means the device's own home screen: Amazon's on Fire TV, Google's elsewhere.
         boolean amazon = Mode.fireTv(this) ? Apps.AMAZON_LAUNCHER.equals(pkg)
-                : pkg != null && Apps.GOOGLE_LAUNCHERS.contains(pkg);
+                : Mode.googleTv(this) && pkg != null && Apps.GOOGLE_LAUNCHERS.contains(pkg);
 
         if (pass && SystemClock.uptimeMillis() - passSince > PASS_MAX_MS) pass = false;
         if (pass) {

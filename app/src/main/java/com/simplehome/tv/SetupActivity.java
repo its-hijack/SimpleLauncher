@@ -246,6 +246,7 @@ public class SetupActivity extends Screen {
 
         // What we detected
         boolean fire = Mode.fireTv(this);
+        boolean google = !fire && Mode.googleTv(this);
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackground(Ui.rounded(this, 0xFF151922, 10, 0, 0));
@@ -253,6 +254,8 @@ public class SetupActivity extends Screen {
         card.addView(text(Mode.detected(this) + " detected", 15, Color.WHITE));
         card.addView(text(fire
                 ? "SimpleLauncher will run in Fire TV mode, with HomeCatch and the Amazon Home button."
+                : google
+                ? "SimpleLauncher will run in Google TV mode, with HomeCatch and the Google Home button."
                 : "SimpleLauncher will run in generic mode, with a Return home button for your device's own home screen.",
                 13, Ui.TEXT_DIM));
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -262,8 +265,8 @@ public class SetupActivity extends Screen {
         content.addView(box, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         buttons.setGravity(Gravity.CENTER);
-        addButton(fire ? "Use generic mode instead" : "Use Fire TV mode instead", false, () -> {
-            Mode.setOverride(this, fire ? Mode.GENERIC : Mode.FIRE_TV);
+        addButton(fire || google ? "Use generic mode instead" : "Use Fire TV mode instead", false, () -> {
+            Mode.setOverride(this, fire || google ? Mode.GENERIC : Mode.FIRE_TV);
             show(WELCOME);
         });
         View start = addButton("Get started", true, () -> show(APPS, 1));

@@ -456,10 +456,19 @@ public class SettingsActivity extends Screen {
                             Apps.toast(this, "Couldn't open Accessibility settings");
                         }
                     });
+            final boolean untilHome = Prefs.passUntilHome(this);
+            valueRow("pass", "Google Home button",
+                    untilHome ? "Google's menus stay until you open SimpleLauncher again"
+                            : "SimpleLauncher comes back when you leave Google's menus",
+                    untilHome ? "Stay in Google" : "Come back", () -> {
+                        Prefs.setBool(this, Prefs.PASS_UNTIL_HOME, !untilHome);
+                        render();
+                    });
             String status = !serviceOn ? "Not set up" : Prefs.hook(this) ? "Running" : "Switched off";
             valueRow("status", "Status", null, status, null);
+            return;   // Google TV ignores the home app setting, so the Home app rows don't apply
         }
-        section("HOME APP", !google);
+        section("HOME APP", true);
         boolean isHome = Mode.isDefaultHome(this);
         valueRow("default_home", "Use SimpleLauncher as your home screen",
                 isHome ? "SimpleLauncher opens when you press Home" : "Choose SimpleLauncher in Android's home app settings",
@@ -746,7 +755,7 @@ public class SettingsActivity extends Screen {
         valueRow("plex_refresh", "Refresh now", "Fetch the latest from your Plex server", "Refresh", this::plexRefresh);
     }
 
-    /** Danger Zone: HomeCatch (Fire TV) or Home app (generic), shortcuts and reset. */
+    /** Danger Zone: HomeCatch (Fire TV, Google TV) or Home app (generic), shortcuts and reset. */
     private void dangerZone() {
         if (Mode.fireTv(this)) homeCatch(); else homeApp();
         section("SHORTCUTS", false);
@@ -760,11 +769,14 @@ public class SettingsActivity extends Screen {
                 Apps.openAmazonHome(this);
             });
         } else {
-            valueRow("device_settings", "Device settings", "Opens Android's settings", "Open", () -> {
+            boolean google = Mode.googleTv(this);
+            valueRow("device_settings", google ? "Google TV settings" : "Device settings",
+                    google ? "Opens Google TV's settings" : "Opens Android's settings", "Open", () -> {
                 if (!Apps.tryStart(this, new Intent(android.provider.Settings.ACTION_SETTINGS)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))) Apps.toast(this, "Couldn't open settings");
             });
-            valueRow("original_home", "Original home screen", "Same as the Return home button", "Open", () -> {
+            valueRow("original_home", google ? "Google home screen" : "Original home screen",
+                    "Same as the " + Mode.homeButtonLabel(this) + " button", "Open", () -> {
                 HomeButtonService.allowAmazonHome();
                 Mode.openOriginalHome(this);
             });
@@ -806,11 +818,13 @@ public class SettingsActivity extends Screen {
                     render();
                 });
         if (modeOpen) {
-            String autoName = Mode.isFireTvDevice(this) ? "Fire TV mode" : "Generic mode";
-            String[] labels = {"Automatic (" + autoName + " on this device)", "Fire TV mode", "Generic mode"};
+            String autoName = Mode.name(Mode.detectedMode(this));
+            final int[] modes = {Mode.AUTO, Mode.FIRE_TV, Mode.GOOGLE_TV, Mode.GENERIC};
+            String[] labels = {"Automatic (" + autoName + " on this device)",
+                    Mode.name(Mode.FIRE_TV), Mode.name(Mode.GOOGLE_TV), Mode.name(Mode.GENERIC)};
             for (int i = 0; i < labels.length; i++) {
-                final int which = i;
-                View opt = valueRowView("mode_opt_" + i, labels[i], null, i == choice ? "Selected" : "", () -> {
+                final int which = modes[i];
+                View opt = valueRowView("mode_opt_" + i, labels[i], null, which == choice ? "Selected" : "", () -> {
                     Mode.setOverride(this, which);
                     modeOpen = false;
                     returnFocusTo = "mode_running";
