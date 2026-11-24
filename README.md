@@ -33,7 +33,7 @@ for devices that have been tested, so nothing can go wrong on the rest.
 | Fire TV Stick HD | AFTSS | Fire OS 7 | ✓ | ✓ |
 | Fire TV Stick 4K Max (2nd Gen) | AFTKRT | Fire OS 8 | ✓ | ✓ |
 | Other Fire TV devices | | | ✓ (as an app) | Not yet |
-| Google TV and Android TV | | | ✓ (as your home screen) | Being tested |
+| Google TV and Android TV (including TVs with their own home screen) | | | ✓ (as your home screen) | Being tested |
 | Other Android devices, phones and tablets (Android 7.1+) | | | ✓ (as your home screen) | Not needed |
 
 - **HomeCatch** makes the Home button on your remote open SimpleLauncher instead of Amazon's home

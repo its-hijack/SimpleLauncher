@@ -492,7 +492,9 @@ detect_device() {
   else
     SUPPORT="generic"
     # Google TV / Android TV ignore the home app setting, so HomeCatch (being tested) does the job.
-    if S pm list packages | tr -d '\r' | grep -qE '^package:com\.google\.android\.(apps\.tv\.launcherx|tvlauncher|leanbacklauncher)$'; then
+    # Android TV sets with the TV maker's own home screen (leanback) count too.
+    if S pm list packages | tr -d '\r' | grep -qE '^package:com\.google\.android\.(apps\.tv\.launcherx|tvlauncher|leanbacklauncher)$' \
+       || S pm list features | grep -q 'android.software.leanback'; then
       GOOGLE_TV=yes; CAN_HOMECATCH=yes
     fi
   fi
@@ -851,7 +853,7 @@ install_launcher() {
   # Ask everything up front, then do it all in one go.
   local want_homecatch=no block_updates=no
   if [ "$CAN_HOMECATCH" = "yes" ] && { [ "$SUPPORT" = "full" ] || [ "$SUPPORT" = "testing" ] || [ "$GOOGLE_TV" = "yes" ]; }; then
-    local whose="Amazon's"; [ "$GOOGLE_TV" = "yes" ] && whose="Google's"
+    local whose="Amazon's"; [ "$GOOGLE_TV" = "yes" ] && whose="your TV's own"
     blank
     say "  ${B}HomeCatch${R} makes the Home button on your remote open SimpleLauncher"
     say "  instead of $whose home screen. You can switch it off any time in"

@@ -443,7 +443,7 @@ public class SettingsActivity extends Screen {
             boolean serviceOn = HomeButtonService.isEnabled(this);
             section("HOMECATCH", true);
             toggleRow("hook", "Open SimpleLauncher when Home is pressed",
-                    serviceOn ? "Replaces Google's home screen with this one"
+                    serviceOn ? "Replaces your TV's own home screen with this one"
                             : "Google TV ignores the home app setting, so HomeCatch catches the Home button",
                     Prefs.hook(this) && serviceOn, this::setHook);
             // Always shown, so HomeCatch can be switched off at the source as well as switched on.
@@ -457,10 +457,11 @@ public class SettingsActivity extends Screen {
                         }
                     });
             final boolean untilHome = Prefs.passUntilHome(this);
-            valueRow("pass", "Google Home button",
-                    untilHome ? "Google's menus stay until you open SimpleLauncher again"
-                            : "SimpleLauncher comes back when you leave Google's menus",
-                    untilHome ? "Stay in Google" : "Come back", () -> {
+            final boolean googleHome = Mode.hasGoogleLauncher(this);
+            valueRow("pass", Mode.homeButtonLabel(this) + " button",
+                    untilHome ? "Your TV's menus stay until you open SimpleLauncher again"
+                            : "SimpleLauncher comes back when you leave your TV's menus",
+                    untilHome ? (googleHome ? "Stay in Google" : "Stay there") : "Come back", () -> {
                         Prefs.setBool(this, Prefs.PASS_UNTIL_HOME, !untilHome);
                         render();
                     });
@@ -775,7 +776,7 @@ public class SettingsActivity extends Screen {
                 if (!Apps.tryStart(this, new Intent(android.provider.Settings.ACTION_SETTINGS)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))) Apps.toast(this, "Couldn't open settings");
             });
-            valueRow("original_home", google ? "Google home screen" : "Original home screen",
+            valueRow("original_home", google ? (Mode.hasGoogleLauncher(this) ? "Google home screen" : "TV home screen") : "Original home screen",
                     "Same as the " + Mode.homeButtonLabel(this) + " button", "Open", () -> {
                 HomeButtonService.allowAmazonHome();
                 Mode.openOriginalHome(this);

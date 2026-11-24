@@ -362,6 +362,8 @@ function Detect-Device {
         foreach ($g in @('com.google.android.apps.tv.launcherx', 'com.google.android.tvlauncher', 'com.google.android.leanbacklauncher')) {
             if ($pk.ContainsKey($g)) { $script:GoogleTv = $true; $script:CanHomeCatch = $true }
         }
+        # Android TV sets with the TV maker's own home screen (leanback) count too.
+        if ((S pm list features) -match 'android\.software\.leanback') { $script:GoogleTv = $true; $script:CanHomeCatch = $true }
     }
 
     $nick = if ($name) { "  $Dot  `"$name`"" } else { '' }
@@ -671,7 +673,7 @@ function Install-Launcher {
     # Ask everything up front, then do it all in one go.
     $wantHomeCatch = $false; $blockUpdates = $false
     if ($script:CanHomeCatch -and ($script:Support -eq 'full' -or $script:Support -eq 'testing' -or $script:GoogleTv)) {
-        $whose = if ($script:GoogleTv) { "Google's" } else { "Amazon's" }
+        $whose = if ($script:GoogleTv) { "your TV's own" } else { "Amazon's" }
         Blank
         Say '  HomeCatch makes the Home button on your remote open SimpleLauncher'
         Say "  instead of $whose home screen. You can switch it off any time in"

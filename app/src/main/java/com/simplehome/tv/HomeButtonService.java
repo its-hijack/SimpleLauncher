@@ -56,6 +56,11 @@ public class HomeButtonService extends AccessibilityService {
 
     private static HomeButtonService instance;
 
+    /** Google TV mode: the device's own home screens (Google's and the TV maker's), refreshed now and then. */
+    private static final long HOMES_REFRESH_MS = 60_000;
+    private Set<String> tvHomes = new HashSet<>();
+    private long tvHomesAt = -HOMES_REFRESH_MS;
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable removeCover = this::hideCover;
     private View cover;
@@ -131,7 +136,7 @@ public class HomeButtonService extends AccessibilityService {
         String cls = event.getClassName() != null ? event.getClassName().toString() : null;
         // "amazon" means the device's own home screen: Amazon's on Fire TV, Google's elsewhere.
         boolean amazon = Mode.fireTv(this) ? Apps.AMAZON_LAUNCHER.equals(pkg)
-                : Mode.googleTv(this) && pkg != null && Apps.GOOGLE_LAUNCHERS.contains(pkg);
+                : Mode.googleTv(this) && pkg != null && isTvHome(pkg);
 
         if (pass && SystemClock.uptimeMillis() - passSince > PASS_MAX_MS) pass = false;
         if (pass) {
@@ -149,6 +154,16 @@ public class HomeButtonService extends AccessibilityService {
             }
         }
         if (amazon) openLauncher();
+    }
+
+    private boolean isTvHome(String pkg) {
+        if (Apps.GOOGLE_LAUNCHERS.contains(pkg)) return true;
+        long now = SystemClock.uptimeMillis();
+        if (now - tvHomesAt > HOMES_REFRESH_MS) {
+            tvHomes = Mode.otherHomes(this);
+            tvHomesAt = now;
+        }
+        return tvHomes.contains(pkg);
     }
 
     @Override

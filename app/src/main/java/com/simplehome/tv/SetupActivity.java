@@ -255,7 +255,7 @@ public class SetupActivity extends Screen {
         card.addView(text(fire
                 ? "SimpleLauncher will run in Fire TV mode, with HomeCatch and the Amazon Home button."
                 : google
-                ? "SimpleLauncher will run in Google TV mode, with HomeCatch and the Google Home button."
+                ? "SimpleLauncher will run in Google TV mode, with HomeCatch and the " + Mode.homeButtonLabel(this) + " button."
                 : "SimpleLauncher will run in generic mode, with a Return home button for your device's own home screen.",
                 13, Ui.TEXT_DIM));
         LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);

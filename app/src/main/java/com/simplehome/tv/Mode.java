@@ -7,7 +7,9 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Fire TV mode, Google TV mode or generic mode.
@@ -57,10 +59,49 @@ final class Mode {
         return isFireTvDevice(c);
     }
 
-    /** True on a Google TV or Android TV with Google's own home screen installed. */
+    /**
+     * True on a Google TV or Android TV: Google's own home screen is installed, or the device
+     * is an Android TV (leanback) set with its maker's home screen instead, e.g. some Sony,
+     * TCL or Hisense TVs.
+     */
     static boolean isGoogleTvDevice(Context c) {
+        if (hasGoogleLauncher(c)) return true;
+        try {
+            return c.getPackageManager().hasSystemFeature("android.software.leanback");
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    static boolean hasGoogleLauncher(Context c) {
         for (String pkg : Apps.GOOGLE_LAUNCHERS) if (isInstalled(c, pkg)) return true;
         return false;
+    }
+
+    /**
+     * The device's built-in home screens: Google's, or the TV maker's own. Leaves out Android's stand-in "fallback" home screens, which only show
+     * while the device is starting up.
+     */
+    static Set<String> otherHomes(Context c) {
+        Set<String> homes = new HashSet<>();
+        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        List<ResolveInfo> found;
+        try {
+            found = c.getPackageManager().queryIntentActivities(home, 0);
+        } catch (RuntimeException e) {
+            return homes;
+        }
+        for (ResolveInfo ri : found) {
+            if (ri.activityInfo == null || ri.priority < 0) continue;
+            // Only the TV's built-in home screens, not other launchers someone has installed.
+            android.content.pm.ApplicationInfo app = ri.activityInfo.applicationInfo;
+            if (app != null && (app.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) == 0) continue;
+            String pkg = ri.activityInfo.packageName;
+            if (pkg == null || pkg.equals(c.getPackageName()) || pkg.endsWith(".settings")
+                    || pkg.contains("setupwizard") || pkg.contains("setupwraith") || pkg.contains("provision")) continue;
+            homes.add(pkg);
+        }
+        return homes;
     }
 
     /** True when running in Google TV mode. */
@@ -101,7 +142,9 @@ final class Mode {
 
     /** The label for the top-right button on the home screen. */
     static String homeButtonLabel(Context c) {
-        return fireTv(c) ? "Amazon Home" : googleTv(c) ? "Google Home" : "Return home";
+        if (fireTv(c)) return "Amazon Home";
+        if (googleTv(c)) return hasGoogleLauncher(c) ? "Google Home" : "TV Home";
+        return "Return home";
     }
 
     static boolean isInstalled(Context c, String pkg) {
@@ -133,8 +176,10 @@ final class Mode {
 
     /** "Return home": opens the device's original home screen (any home app that isn't SimpleLauncher). */
     static void openOriginalHome(Context c) {
-        if (googleTv(c)) {   // straight to Google's home screen, in case another launcher is installed
-            for (String pkg : Apps.GOOGLE_LAUNCHERS) {
+        if (googleTv(c)) {   // straight to Google's (or the TV maker's) home screen
+            List<String> order = new java.util.ArrayList<>(Apps.GOOGLE_LAUNCHERS);
+            order.addAll(otherHomes(c));
+            for (String pkg : order) {
                 if (!isInstalled(c, pkg)) continue;
                 Intent g = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(pkg)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -144,7 +189,7 @@ final class Mode {
         Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
         List<ResolveInfo> homes = c.getPackageManager().queryIntentActivities(home, 0);
         for (ResolveInfo ri : homes) {
-            if (ri.activityInfo == null || c.getPackageName().equals(ri.activityInfo.packageName)) continue;
+            if (ri.activityInfo == null || ri.priority < 0 || c.getPackageName().equals(ri.activityInfo.packageName)) continue;
             Intent open = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
             open.setComponent(new ComponentName(ri.activityInfo.packageName, ri.activityInfo.name));
             open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
