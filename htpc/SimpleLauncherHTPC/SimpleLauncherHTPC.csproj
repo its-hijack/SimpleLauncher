@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>SimpleLauncher</AssemblyName>
+    <RootNamespace>SimpleLauncherHTPC</RootNamespace>
+    <StartupObject>SimpleLauncherHTPC.Program</StartupObject>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Product>SimpleLauncher</Product>
+    <Company>Cherry Universe</Company>
+    <Copyright>Cherry Universe</Copyright>
+    <Description>SimpleLauncher for Windows HTPCs</Description>
+    <Version>1.0.0</Version>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\icon.ico" />
+  </ItemGroup>
+
+</Project>

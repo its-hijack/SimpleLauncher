@@ -14,7 +14,7 @@ name: Build and release
 
 on:
   push:
-    tags: ['*']
+    tags: ['*', '!htpc-*']
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,90 @@
+# Builds SimpleLauncher for Windows (htpc/) and, when run by hand, publishes it as a GitHub Release.
+#
+# To release a new build:
+#   1. Set the build in htpc/version.txt (DDMMYY-build, e.g. 241126-1.1).
+#   2. Open Actions > Build and release (Windows) > Run workflow.
+# The release is tagged htpc-<build> and is never marked "latest", so TVs keep
+# getting the Android app from the normal releases.
+#
+# Every push that changes htpc/ also builds it (no release), as a check, and keeps
+# the installer as a downloadable artifact on the run.
+#
+# Optional secret (repository Settings > Secrets and variables > Actions):
+#   SGDB_API_KEY   a SteamGridDB API key, built in for artwork search
+
+name: Build and release (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths:
+      - 'htpc/**'
+      - '.github/workflows/htpc-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Read the version
+        id: version
+        shell: pwsh
+        run: |
+          $build = (Get-Content htpc/version.txt -Raw).Trim()
+          "build=$build" >> $env:GITHUB_OUTPUT
+
+      - name: Stamp the build number and artwork key
+        shell: pwsh
+        env:
+          SGDB: ${{ secrets.SGDB_API_KEY }}
+        run: |
+          $f = 'htpc/SimpleLauncherHTPC/BuildInfo.cs'
+          $t = Get-Content $f -Raw
+          $t = $t -replace 'BuildTag = "[^"]*"', ('BuildTag = "${{ steps.version.outputs.build }}"')
+          $key = if ($env:SGDB) { $env:SGDB } else { '' }
+          $t = $t.Replace('SgdbKey = ""', 'SgdbKey = "' + $key + '"')
+          Set-Content -Path $f -Value $t -Encoding utf8
+
+      - name: Build
+        run: >
+          dotnet publish htpc/SimpleLauncherHTPC/SimpleLauncherHTPC.csproj -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
+
+      - name: Make the installer
+        shell: pwsh
+        env:
+          HTPC_BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc htpc/installer/SimpleLauncherHTPC.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SimpleLauncherHTPC-${{ steps.version.outputs.build }}-Setup
+          path: out/*.exe
+
+      - name: Publish the release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: htpc-${{ steps.version.outputs.build }}
+          target_commitish: ${{ github.sha }}
+          name: SimpleLauncher for Windows (build ${{ steps.version.outputs.build }})
+          files: out/*.exe
+          make_latest: false
+          body: |
+            SimpleLauncher for Windows HTPCs. Download **SimpleLauncherHTPC-${{ steps.version.outputs.build }}-Setup.exe** and run it.
+
+            It isn't code-signed yet, so Windows may show "Windows protected your PC" the first time: choose **More info › Run anyway**.
