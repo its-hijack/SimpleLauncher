@@ -117,13 +117,19 @@ public class MainActivity extends Activity {
         filter.addDataScheme("package");
         registerReceiver(packageReceiver, filter);
 
-        // First launch (or first launch after updating): run setup.
-        if (!Prefs.setupDone(this)) Screen.open(this, new Intent(this, SetupActivity.class));
+        // First launch: go straight into setup (no home screen first, no slide), so the first thing
+        // anyone sees is setup's pause and then its Welcome screen building itself up.
+        if (!Prefs.setupDone(this)) {
+            root.setVisibility(View.INVISIBLE);
+            startActivity(new Intent(this, SetupActivity.class));
+            overridePendingTransition(0, 0);
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        root.setVisibility(View.VISIBLE);
         HomeButtonService.launcherShown();
         applySettings();
         reloadApps();

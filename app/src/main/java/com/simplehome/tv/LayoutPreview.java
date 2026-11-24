@@ -20,6 +20,8 @@ final class LayoutPreview extends View {
     int cardSize = 2;
     boolean showApps = true;
     boolean showCards = true;
+    int background = 0xFF0A0C11;   // the screen behind it all
+    int accent = 0;                // progress bars on the Continue Watching cards (0 = none)
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF r = new RectF();
@@ -37,13 +39,20 @@ final class LayoutPreview extends View {
         invalidate();
     }
 
+    /** Use your background and accent colours (first-time setup chooses them on the same screen). */
+    void colours(int background, int accent) {
+        this.background = background;
+        this.accent = accent;
+        invalidate();
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         float w = getWidth(), h = getHeight();
         float s = w / SCREEN_W;          // dp on the TV → pixels here
         float corner = Ui.dp(getContext(), 8);
 
-        rect(canvas, 0, 0, w, h, corner, 0xFF0A0C11);
+        rect(canvas, 0, 0, w, h, corner, background);
 
         // Top bar: logo and clock on the left, three buttons on the right
         float pad = 42 * s, top = 32 * s;
@@ -96,6 +105,10 @@ final class LayoutPreview extends View {
         while (x < w - x0) {
             float right = Math.min(x + cw, w);
             rect(canvas, x, y, right, y + ch, 4 * s, CARD_COLOURS[i % CARD_COLOURS.length]);
+            if (accent != 0) {
+                float done = (right - x) * (0.25f + 0.15f * (i % 4));
+                rect(canvas, x, y + ch - 3 * s, x + done, y + ch, 0, accent);
+            }
             x += cw + gap;
             i++;
         }

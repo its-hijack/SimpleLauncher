@@ -47,6 +47,12 @@ public class SetupActivity extends Screen {
     private boolean wantJellyfin;
     private JellyfinLogin jellyfinLogin;
     private boolean redrawing;        // redrawing the same step: no animations
+    private boolean introPending = true;   // the Welcome screen builds itself up the first time it shows
+    private boolean introRunning;
+    private final List<View> introViews = new java.util.ArrayList<>();
+    private View introGlow;
+    private LayoutPreview lookPreview;     // Make it yours: the little home screen
+    private String lookReturnTag;          // Make it yours: the option to re-select after a picker
 
     // Pick your apps
     private List<Apps.Entry> apps;
@@ -100,6 +106,15 @@ public class SetupActivity extends Screen {
     }
 
     @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (introRunning) {
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) finishIntro();
+            return true;   // the press only skips the animation
+        }
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override
     public void onBackPressed() {
         if (step == WELCOME) return;           // nothing before Welcome
         show(previous(step), -1);
@@ -150,6 +165,9 @@ public class SetupActivity extends Screen {
             jellyfinLogin.cancel();
             jellyfinLogin = null;
         }
+        if (introRunning) finishIntro();
+        buttons.setAlpha(1f);
+        buttons.setTranslationY(0f);
         step = s;
         int bg = Prefs.background(this);
         getWindow().setBackgroundDrawable(new ColorDrawable(bg));
@@ -199,6 +217,18 @@ public class SetupActivity extends Screen {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER);
 
+        // A soft glow in the accent colour behind the logo (part of the opening animation).
+        View glow = new View(this);
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setGradientType(android.graphics.drawable.GradientDrawable.RADIAL_GRADIENT);
+        int accent = Ui.accent(this) & 0x00FFFFFF;
+        g.setColors(new int[]{0x4D000000 | accent, 0x14000000 | accent, 0x00000000});
+        g.setGradientRadius(Ui.dp(this, 210));
+        glow.setBackground(g);
+        FrameLayout.LayoutParams glp = new FrameLayout.LayoutParams(Ui.dp(this, 420), Ui.dp(this, 420), Gravity.CENTER);
+        content.addView(glow, glp);
+        glow.setTranslationY(-Ui.dp(this, 70));
+
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.logo);
         logo.setAdjustViewBounds(true);
@@ -238,6 +268,62 @@ public class SetupActivity extends Screen {
         });
         View start = addButton("Get started", true, () -> show(APPS, 1));
         start.requestFocus();
+
+        if (introPending) {
+            introPending = false;
+            playIntro(glow, logo, title, maker, sub, card, start);
+        }
+    }
+
+    /**
+     * The first thing you see: one second on the background colour, then the Welcome screen builds
+     * itself up over about two seconds. Any button press skips to the end.
+     */
+    private void playIntro(View glow, View logo, View title, View maker, View sub, View card, final View start) {
+        introRunning = true;
+        introViews.clear();
+        introGlow = glow;
+        android.view.animation.Interpolator ease = new android.view.animation.DecelerateInterpolator(2.2f);
+        android.view.animation.Interpolator pop = new android.view.animation.OvershootInterpolator(1.4f);
+        final long pause = 1000;
+        enter(glow, pause, 1100, 0, 0.55f, ease);
+        enter(logo, pause + 120, 800, 14, 0.82f, pop);
+        enter(title, pause + 520, 650, 18, 1f, ease);
+        enter(maker, pause + 720, 600, 10, 1f, ease);
+        enter(sub, pause + 880, 600, 10, 1f, ease);
+        enter(card, pause + 1100, 650, 16, 1f, ease);
+        enter(buttons, pause + 1400, 600, 12, 1f, ease);
+        main.postDelayed(() -> {
+            if (!introRunning) return;
+            introRunning = false;
+            // One pulse on Get started, so it's clear what to press.
+            start.animate().scaleX(1.08f).scaleY(1.08f).setDuration(220).withEndAction(
+                    () -> start.animate().scaleX(1f).scaleY(1f).setDuration(320).start()).start();
+        }, pause + 2050);
+    }
+
+    private void enter(View v, long delay, long duration, int fromDp, float fromScale, android.view.animation.Interpolator in) {
+        introViews.add(v);
+        v.setAlpha(0f);
+        v.setTranslationY(v.getTranslationY() + Ui.dp(this, fromDp));
+        v.setScaleX(fromScale);
+        v.setScaleY(fromScale);
+        float targetY = v == introGlow ? -Ui.dp(this, 70) : 0f;   // the glow sits above centre
+        v.animate().alpha(1f).translationY(targetY).scaleX(1f).scaleY(1f)
+                .setStartDelay(delay).setDuration(duration).setInterpolator(in).start();
+    }
+
+    /** Skip to the end of the opening animation. */
+    private void finishIntro() {
+        introRunning = false;
+        for (View v : introViews) {
+            v.animate().cancel();
+            v.setAlpha(1f);
+            v.setScaleX(1f);
+            v.setScaleY(1f);
+            v.setTranslationY(v == introGlow ? -Ui.dp(this, 70) : 0f);
+        }
+        introViews.clear();
     }
 
     // ------------------------------------------------------------------ Pick your apps
@@ -304,57 +390,177 @@ public class SetupActivity extends Screen {
     private void look() {
         LinearLayout box = column();
         box.addView(heading("Make it yours",
-                "Pick a background, an accent colour and how the clock looks. More options are in Settings → Appearance."));
+                "Choose how your home screen looks. The preview changes as you go, and everything can be changed later in Settings."));
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
 
+        // Left: layout and sizes, then colours and clock (scrolls if the TV is small)
+        ScrollView scroll = new ScrollView(this);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setClipToPadding(false);
         LinearLayout options = new LinearLayout(this);
         options.setOrientation(LinearLayout.VERTICAL);
-        View first = option("Background", colourName(Ui.BG_NAMES, Ui.BG_COLORS, Prefs.background(this)),
-                () -> Screen.open(this, new Intent(this, BackgroundPickerActivity.class)));
-        options.addView(first);
-        options.addView(option("Accent colour", colourName(Ui.ACCENT_NAMES, Ui.ACCENT_COLORS, Prefs.accent(this)),
-                () -> Screen.open(this, new Intent(this, AccentPickerActivity.class))));
+        scroll.addView(options);
+
+        options.addView(sectionLabel("LAYOUT", false));
+        final View layout = layoutOption();
+        options.addView(layout);
+        options.addView(sizeOption("App size", Prefs.APP_SIZE, Prefs.appSize(this)));
+        if (Watching.available(this)) {
+            options.addView(sizeOption("Continue Watching size", Prefs.CARD_SIZE, Prefs.cardSize(this)));
+        }
+        options.addView(sectionLabel("COLOURS AND CLOCK", true));
+        options.addView(option("Background", colourName(Ui.BG_NAMES, Ui.BG_COLORS, Prefs.background(this)), () -> {
+            lookReturnTag = "Background";
+            Screen.open(this, new Intent(this, BackgroundPickerActivity.class));
+        }));
+        options.addView(option("Accent colour", colourName(Ui.ACCENT_NAMES, Ui.ACCENT_COLORS, Prefs.accent(this)), () -> {
+            lookReturnTag = "Accent colour";
+            Screen.open(this, new Intent(this, AccentPickerActivity.class));
+        }));
         final boolean clock24 = Prefs.clock24(this);
         options.addView(option("Clock", clock24 ? "24-hour" : "12-hour", () -> {
             Prefs.setBool(this, Prefs.CLOCK_24, !clock24);
-            show(LOOK);
-            View again = content.findViewWithTag("Clock");
-            if (again != null) again.requestFocus();
+            lookReturnTag = "Clock";
+            redraw();
         }));
-        row.addView(options, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        row.addView(scroll, new LinearLayout.LayoutParams(Ui.dp(this, 380), ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // Preview of the home screen
+        // Right: the little home screen, following every change
         LinearLayout previewBox = new LinearLayout(this);
         previewBox.setOrientation(LinearLayout.VERTICAL);
-        previewBox.addView(text("PREVIEW", 11, 0xFF8A93A6));
-        FrameLayout screen = new FrameLayout(this);
-        screen.setBackground(Ui.rounded(this, Prefs.background(this), 10, 1, 0xFF2A3040));
-        screen.setPadding(Ui.dp(this, 14), Ui.dp(this, 12), Ui.dp(this, 14), Ui.dp(this, 12));
-        screen.addView(BackgroundPickerActivity.homePreview(this, Prefs.accent(this)));
-        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(Ui.dp(this, 280), Ui.dp(this, 158));
-        sp.setMargins(0, Ui.dp(this, 6), 0, 0);
-        previewBox.addView(screen, sp);
-        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        previewBox.addView(sectionLabel("PREVIEW", false));
+        lookPreview = new LayoutPreview(this);
+        lookPreview.colours(Prefs.background(this), Prefs.accent(this));
+        updateLookPreview();
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(Ui.dp(this, 380), Ui.dp(this, 214));
+        previewBox.addView(lookPreview, sp);
+        LinearLayout.LayoutParams pp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         pp.setMargins(Ui.dp(this, 32), 0, 0, 0);
         row.addView(previewBox, pp);
 
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        rlp.setMargins(0, Ui.dp(this, 18), 0, 0);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
+        rlp.setMargins(0, Ui.dp(this, 14), 0, 0);
         box.addView(row, rlp);
         content.addView(box);
 
-        addButton("Back", false, () -> show(APPS, -1));
+        addButton("Back", false, () -> show(previous(LOOK), -1));
         addButton("Continue", true, () -> show(next(LOOK), 1));
-        first.requestFocus();
+        View back = lookReturnTag != null ? content.findViewWithTag(lookReturnTag) : null;
+        lookReturnTag = null;
+        (back != null ? back : layout).requestFocus();
+    }
+
+    private void updateLookPreview() {
+        if (lookPreview != null) {
+            lookPreview.set(Prefs.gridLayout(this), Prefs.appSize(this), Prefs.cardSize(this), true, Watching.available(this));
+        }
+    }
+
+    private TextView sectionLabel(String label, boolean gapAbove) {
+        TextView t = text(label, 11, 0xFF8A93A6);
+        t.setLetterSpacing(0.15f);
+        t.setPadding(Ui.dp(this, 2), Ui.dp(this, gapAbove ? 10 : 0), 0, Ui.dp(this, 6));
+        return t;
+    }
+
+    /** Default or Grid: Select, left or right switches between them. */
+    private View layoutOption() {
+        LinearLayout pills = new LinearLayout(this);
+        pills.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView def = pill("Default");
+        final TextView grid = pill("Grid");
+        pills.addView(def);
+        LinearLayout.LayoutParams gl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        gl.setMargins(Ui.dp(this, 6), 0, 0, 0);
+        pills.addView(grid, gl);
+        final Runnable paint = () -> {
+            boolean g = Prefs.gridLayout(this);
+            stylePill(def, !g);
+            stylePill(grid, g);
+        };
+        paint.run();
+        final Runnable flip = () -> {
+            Prefs.setBool(this, Prefs.LAYOUT_GRID, !Prefs.gridLayout(this));
+            paint.run();
+            updateLookPreview();
+        };
+        View row = optionRow("Layout", pills, flip);
+        row.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode != android.view.KeyEvent.KEYCODE_DPAD_LEFT && keyCode != android.view.KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN
+                    && (keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT) != Prefs.gridLayout(this)) flip.run();
+            return true;
+        });
+        return row;
+    }
+
+    private TextView pill(String label) {
+        TextView t = text(label, 13, 0);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        t.setPadding(Ui.dp(this, 12), Ui.dp(this, 4), Ui.dp(this, 12), Ui.dp(this, 4));
+        return t;
+    }
+
+    private void stylePill(TextView t, boolean chosen) {
+        t.setBackground(Ui.rounded(this, chosen ? Ui.accent(this) : 0x33808A9C, 12, 0, 0));
+        t.setTextColor(chosen && Ui.accent(this) == 0xFFF2F4F7 ? 0xFF0C0F15 : Color.WHITE);
+    }
+
+    /** A five-step size: left and right on the remote change it (Select steps through too). */
+    private View sizeOption(String label, final String key, int start) {
+        LinearLayout right = new LinearLayout(this);
+        right.setOrientation(LinearLayout.HORIZONTAL);
+        right.setGravity(Gravity.CENTER_VERTICAL);
+        final View[] dots = new View[5];
+        for (int i = 0; i < 5; i++) {
+            dots[i] = new View(this);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(this, 13), Ui.dp(this, 6));
+            lp.setMargins(Ui.dp(this, 3), 0, 0, 0);
+            right.addView(dots[i], lp);
+        }
+        final TextView name = text("", 14, 0);
+        name.setTextColor(Ui.focusColors(0xFF0C0F15, Ui.TEXT_DIM));
+        name.setDuplicateParentStateEnabled(true);
+        name.setMinWidth(Ui.dp(this, 62));
+        name.setGravity(Gravity.RIGHT);
+        right.addView(name);
+        final int[] value = {Watching.clamp(start)};
+        final Runnable paint = () -> {
+            for (int i = 0; i < 5; i++) dots[i].setBackground(Ui.rounded(this, i <= value[0] ? Ui.accent(this) : 0x55808A9C, 3, 0, 0));
+            name.setText(Watching.SIZE_NAMES[value[0]]);
+        };
+        paint.run();
+        final java.util.function.IntConsumer setTo = n -> {
+            value[0] = Watching.clamp(n);
+            Prefs.setInt(this, key, value[0]);
+            paint.run();
+            updateLookPreview();
+        };
+        View row = optionRow(label, right, () -> setTo.accept((value[0] + 1) % 5));
+        row.setOnKeyListener((v, keyCode, event) -> {
+            int step = keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT ? 1
+                    : keyCode == android.view.KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 0;
+            if (step == 0) return false;
+            if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) setTo.accept(value[0] + step);
+            return true;
+        });
+        return row;
     }
 
     private View option(String label, String value, Runnable onClick) {
+        TextView v = text(value, 14, 0);
+        v.setTextColor(Ui.focusColors(0xFF0C0F15, Ui.TEXT_DIM));
+        v.setDuplicateParentStateEnabled(true);
+        return optionRow(label, v, onClick);
+    }
+
+    private View optionRow(String label, View right, Runnable onClick) {
         LinearLayout r = new LinearLayout(this);
         r.setOrientation(LinearLayout.HORIZONTAL);
         r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setMinimumHeight(Ui.dp(this, 46));
+        r.setMinimumHeight(Ui.dp(this, 42));
         r.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 14), Ui.dp(this, 8));
         r.setBackground(Ui.rowBackground(this));
         r.setFocusable(true);
@@ -364,10 +570,7 @@ public class SetupActivity extends Screen {
         l.setTextColor(Ui.focusColors(0xFF0C0F15, Ui.TEXT));
         l.setDuplicateParentStateEnabled(true);
         r.addView(l, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView v = text(value, 14, 0);
-        v.setTextColor(Ui.focusColors(0xFF0C0F15, Ui.TEXT_DIM));
-        v.setDuplicateParentStateEnabled(true);
-        r.addView(v);
+        r.addView(right);
         r.setOnClickListener(x -> onClick.run());
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, 0, 0, Ui.dp(this, 6));
